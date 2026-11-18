@@ -29,14 +29,15 @@ It is the first, data-only step of the FarmIQ crop-planning idea.
 | Source | What | Period | Notes |
 |---|---|---|---|
 | [CEDA Agri Market API](https://api.ceda.ashoka.edu.in/) (Ashoka University) | Daily min / max / modal price and arrivals per market | 2003 to latest monthly update | Mirrors Agmarknet; free for non-commercial use with credit |
-| [Agmarknet 2.0](https://agmarknet.gov.in/) Daily Price and Arrival report | Daily prices per market, variety and grade | 2021 onward | Downloaded by hand (the site uses a CAPTCHA); used to cross-check CEDA |
+| [Agmarknet 2.0](https://agmarknet.gov.in/) Daily Price and Arrival report | Daily prices per market, variety and grade | 2021 onward | Downloaded by hand (the site uses a CAPTCHA). Cross-checks CEDA where they overlap, and extends prices past CEDA's last date (added only after it, so nothing is counted twice) |
 | [Open-Meteo historical weather](https://open-meteo.com/en/docs/historical-weather-api) (ERA5) | Daily rainfall and maximum temperature at each district centre | 2003 onward | CC BY 4.0; free for non-commercial use |
 
 Districts planned: Ahilyanagar (Ahmednagar), Chh. Sambhajinagar (Aurangabad),
 Beed, Jalna, Nashik, Pune, Solapur, Dharashiv (Osmanabad).
 
-**Published:** tomato and onion for all eight districts, 2003 to October 2025
-(Beed and Jalna have little or no tomato data in the source).
+**Published:** tomato and onion for all eight districts, 2003 to 18 November
+2026: CEDA to 30 October 2025, then Agmarknet downloads (Beed and Jalna have
+little or no tomato data in the source). Arrivals come from CEDA only.
 
 On 9,938 market-days present in both sources, CEDA's modal price matched
 Agmarknet's exactly on all but one day.
@@ -111,8 +112,8 @@ echo CEDA_API_KEY=your-key > .env                     # free key from api.ceda.a
 
 ## Known limitations
 
-- CEDA updates monthly, so the newest weeks are missing; Agmarknet covers them
-  but needs a manual download.
+- CEDA updates monthly and lags; newer prices need a manual Agmarknet download
+  (a CAPTCHA per year of data per crop). Arrivals after CEDA's last date are not included.
 - Some markets report irregularly; years with too little data are left blank
   rather than filled in.
 - Arrivals at one market are a weak proxy for regional supply.
