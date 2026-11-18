@@ -570,6 +570,7 @@
     const m = state.meta; const box = $("about"); clear(box);
     const items = [
       `Daily wholesale (mandi) prices for ${m.districts.join(", ")} districts, ${m.date_range[0]} to ${m.date_range[1]}: ${fmt.int(m.n_price_days)} market-days after cleaning.`,
+      ...(m.combined_market_days ? [`${fmt.int(m.combined_market_days)} market-days had several lots or varieties reported (the source does not say which); for those days the median of their modal prices is used, not one picked at random.`] : []),
       `Records removed (counted, not hidden): ${Object.entries(m.rejected).map(([k, v]) => `${fmt.int(v)} ${REASONS[k] || k.replaceAll("_", " ")}`).join("; ") || "none"}.`,
       `A month counts only with at least ${m.rules.min_days_per_month} reporting days, and a year only with at least ${m.rules.min_months_per_year} such months. A verdict needs ${m.rules.min_years_for_verdict}+ years; a month is "reliably" dear or cheap if it was so in ${Math.round(m.rules.reliable_share * 100)}% of years.`,
       "Prices are nominal (not adjusted for inflation); the month-vs-year comparisons remove inflation within each year.",
@@ -577,7 +578,7 @@
     ];
     if (m.source_check && m.source_check.n_matched) {
       const s = m.source_check;
-      items.push(`Cross-check: on ${fmt.int(s.n_matched)} market-days found in both CEDA and our own Agmarknet downloads, ${Math.round(s.share_equal * 100)}% of modal prices match exactly (median difference ₹${s.median_abs_diff_inr_quintal}/quintal).`);
+      items.push(`Cross-check: on ${fmt.int(s.n_matched)} market-days found in both CEDA and our own Agmarknet downloads, ${s.share_equal === 1 ? "100" : (Math.floor(s.share_equal * 10000) / 100).toFixed(2)}% of modal prices match exactly (median difference ₹${s.median_abs_diff_inr_quintal}/quintal).`);
     }
     const ul = el("ul");
     items.forEach((t) => ul.appendChild(el("li", {}, t)));

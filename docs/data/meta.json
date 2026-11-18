@@ -1,24 +1,32 @@
 {
- "generated_at": "2026-11-18T15:23:40+00:00",
+ "generated_at": "2026-11-18T15:52:15+00:00",
  "date_range": [
-  "2003-01-04",
+  "2003-01-01",
   "2025-10-30"
  ],
  "districts": [
   "Ahilyanagar (Ahmednagar)",
+  "Beed",
   "Chh. Sambhajinagar (Aurangabad)",
-  "Nashik"
+  "Dharashiv (Osmanabad)",
+  "Jalna",
+  "Nashik",
+  "Pune",
+  "Solapur"
  ],
  "commodities": [
-  "tomato"
+  "tomato",
+  "onion"
  ],
- "n_price_days": 33546,
+ "n_price_days": 214175,
+ "combined_market_days": 8893,
  "rejected": {
-  "missing_price": 9
+  "duplicate": 129,
+  "missing_price": 67
  },
  "source_check": {
-  "n_matched": 4309,
-  "share_equal": 0.9997679275934092,
+  "n_matched": 9938,
+  "share_equal": 0.9998993761320185,
   "median_abs_diff_inr_quintal": 0.0,
   "files": [
    "tomato_MH_2021.csv",
