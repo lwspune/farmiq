@@ -36,6 +36,28 @@
       <p class="note">Patterns in past prices are not a forecast. Each answer says how many years it rests on.</p>
     </section>
 
+    <section class="card" aria-labelledby="plan-h">
+      <h2 id="plan-h">Planning to transplant?</h2>
+      <p class="muted">Pick a transplant month to see what this market's prices did in the harvest months that follow. Add your own cost and yield to see how often past prices covered them.</p>
+      <form id="planner" class="planner" novalidate>
+        <label>Transplant month <select id="pl-month"></select></label>
+        <label>First harvest after <select id="pl-first"></select></label>
+        <label>Harvesting lasts <select id="pl-length"></select></label>
+        <fieldset class="seg">
+          <legend>Compare with</legend>
+          <label><input type="radio" name="pl-years" value="recent" checked> Last <span id="pl-recent-n">10</span> years</label>
+          <label><input type="radio" name="pl-years" value="all"> All years</label>
+        </fieldset>
+        <label>Your cost per acre (₹) <input id="pl-cost" type="number" inputmode="decimal" min="1" step="any" placeholder="e.g. your total"></label>
+        <label>Your marketable yield (kg per acre) <input id="pl-yield" type="number" inputmode="decimal" min="1" step="any" placeholder="after rejection"></label>
+        <label>Selling cost (₹ per kg) <input id="pl-sell" type="number" inputmode="decimal" min="0" step="any" placeholder="transport, commission, packing"></label>
+      </form>
+      <div id="pl-result" class="pl-result" aria-live="polite"></div>
+      <div id="chart-plan" class="chart"></div>
+      <details><summary>Show as table</summary><div id="table-plan"></div></details>
+      <p class="note">Mandi modal (wholesale) prices, not your farm-gate price; add your selling cost to compare fairly. Prices are not adjusted for inflation, so recent years are the fair comparison with today's costs. Crop timing is your choice of assumption.</p>
+    </section>
+
     <section class="card" aria-labelledby="season-h">
       <h2 id="season-h">Which months are expensive?</h2>
       <p class="muted">Each month's price compared with the same year's average (1.0 = an average month). Dividing by each year's own level removes inflation and boom or bust years, leaving only the shape. Dot = typical year; bar = range in 8 of 10 years.</p>
@@ -70,6 +92,18 @@
       <p class="muted">Each dot is one month. Across: arrivals at this market compared with that year's average. Up: price compared with that year's average.</p>
       <div id="chart-arrivals" class="chart"></div>
       <details><summary>Show as table</summary><div id="table-arrivals"></div></details>
+    </section>
+
+    <section class="card" aria-labelledby="wx-h">
+      <h2 id="wx-h">Does local weather explain price surprises?</h2>
+      <p class="muted">A "price surprise" is how far a month's price was from the usual level for that month. Each dot shows how strongly unusual rain or heat in the district lined up with surprises 0–3 months later (correlation, −1 to +1; beyond ±0.3 is worth a look).</p>
+      <p id="wx-verdict" class="pl-result" aria-live="polite"></p>
+      <div id="chart-wx" class="chart"></div>
+      <div class="two-up">
+        <div><h3 class="mini">Usual rainfall (mm per month)</h3><div id="chart-rain" class="chart"></div></div>
+        <div><h3 class="mini">Usual daytime high (°C)</h3><div id="chart-tmax" class="chart"></div></div>
+      </div>
+      <details><summary>Show as table</summary><div id="table-wx"></div></details>
     </section>
 
     <section class="card" aria-labelledby="vol-h">

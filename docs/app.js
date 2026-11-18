@@ -289,6 +289,220 @@
     table("table-vol", ["Month", "Typical swing", "Years"], data.map((d) => [MONTHS[d.month - 1], Math.round(d.cv * 100) + "%", String(d.n)]));
   }
 
+  // ---------- weather ----------
+  function weatherCard(m, p) {
+    const vbox = $("wx-verdict"); clear(vbox);
+    const wx = m.weather;
+    if (!wx) {
+      vbox.textContent = "Not enough price history at this market to compare with weather.";
+      ["chart-wx", "chart-rain", "chart-tmax"].forEach((id) => clear($(id)));
+      table("table-wx", [], []);
+      return;
+    }
+    const v = wx.verdict;
+    const name = { rain: "rainfall", heat: "heat" };
+    const when = (lag) => (lag === 0 ? "the same month" : `${lag} month${lag > 1 ? "s" : ""} later`);
+    if (v.verdict === "insufficient") {
+      vbox.textContent = "Not enough months with both prices and weather to say.";
+    } else if (v.verdict === "link") {
+      vbox.textContent = `Possibly: unusual ${name[v.var]} lined up with price surprises ${when(v.lag)} (r = ${v.r}, ${v.n} months). Eight combinations were tested, so treat a single result near ±0.3 as a hint, not proof.`;
+    } else {
+      vbox.textContent = `Only weakly. The strongest link is unusual ${name[v.var]} with prices ${when(v.lag)} (r = ${v.r}, ${v.n} months). Local weather explains little; prices are mostly set by supply from across India.`;
+    }
+
+    const corr = wx.corr.filter((c) => c.r != null).map((c) => ({ ...c, label: name[c.var] }));
+    const series = ["rainfall", "heat"];
+    const w = width("chart-wx");
+    mount("chart-wx", Plot.plot({
+      ...base(p, w), height: 240, marginLeft: 44, marginBottom: 40,
+      x: { domain: [0, 1, 2, 3], type: "band", label: "Price surprise this many months after the weather →", labelAnchor: "right", labelOffset: 34,
+        tickFormat: (l) => (l === 0 ? "same month" : `+${l}`) },
+      y: { domain: [-0.6, 0.6], label: "↑ Correlation", grid: true },
+      color: { domain: series, range: [p.s[0], p.s[1]], legend: true },
+      marks: [
+        Plot.ruleY([0], { stroke: p.axis, strokeWidth: 1.5 }),
+        Plot.ruleY([-0.3, 0.3], { stroke: p.axis, strokeOpacity: 0.6 }),
+        ...[["rain", -8], ["heat", 8]].map(([v, dx]) => Plot.dot(corr.filter((c) => c.var === v), {
+          x: "lag", y: "r", fill: "label", r: 6, stroke: p.surface, strokeWidth: 2, dx,
+          channels: { Weather: "label", Months: "n" },
+          tip: { format: { x: (l) => (l === 0 ? "same month" : `+${l} months`), y: (r) => r.toFixed(2), fill: false } } })),
+      ],
+    }));
+
+    const normals = wx.normals.map(([month, rain, tmax]) => ({ month, rain, tmax }));
+    const half = width("chart-rain");
+    mount("chart-rain", Plot.plot({
+      ...base(p, half), height: 200, marginLeft: 40,
+      x: { ...monthAxis, domain: d3.range(1, 13), type: "band", tickFormat: (mo) => MONTHS[mo - 1][0] },
+      y: { label: null, grid: true },
+      marks: [
+        Plot.barY(normals, { x: "month", y: "rain", fill: p.s[0], rx: 2, insetLeft: 2, insetRight: 2,
+          tip: { format: { x: (mo) => MONTHS[mo - 1], y: (v) => `${Math.round(v)} mm` } } }),
+        Plot.ruleY([0], { stroke: p.axis }),
+      ],
+    }));
+    mount("chart-tmax", Plot.plot({
+      ...base(p, width("chart-tmax")), height: 200, marginLeft: 40,
+      x: { ...monthAxis, domain: d3.range(1, 13), tickFormat: (mo) => MONTHS[mo - 1][0] },
+      y: { label: null, grid: true },
+      marks: [
+        Plot.lineY(normals, { x: "month", y: "tmax", stroke: p.s[0], strokeWidth: 2, curve: "monotone-x" }),
+        Plot.dot(normals, { x: "month", y: "tmax", r: 3.5, fill: p.s[0], stroke: p.surface, strokeWidth: 1.5,
+          tip: { format: { x: (mo) => MONTHS[mo - 1], y: (v) => `${v.toFixed(1)} °C` } } }),
+      ],
+    }));
+    table("table-wx", ["Weather", "Months later", "Correlation", "Months compared"],
+      wx.corr.map((c) => [name[c.var], String(c.lag), c.r == null ? "–" : c.r.toFixed(2), String(c.n)]));
+    const t = $("table-wx");
+    const extra = el("div");
+    t.appendChild(extra);
+    const wrap = el("div", { class: "table-scroll" });
+    const tb = el("table");
+    const hr = el("tr");
+    ["Month", "Usual rain (mm)", "Usual daytime high (°C)"].forEach((h) => hr.appendChild(el("th", { scope: "col" }, h)));
+    const thead = el("thead"); thead.appendChild(hr); tb.appendChild(thead);
+    const body = el("tbody");
+    normals.forEach((n) => {
+      const tr = el("tr");
+      [MONTHS[n.month - 1], String(Math.round(n.rain)), n.tmax.toFixed(1)].forEach((c) => tr.appendChild(el("td", {}, c)));
+      body.appendChild(tr);
+    });
+    tb.appendChild(body); wrap.appendChild(tb); extra.appendChild(wrap);
+    extra.appendChild(el("p", { class: "note" }, `Weather at the ${m.district} district centre, ${wx.years[0]}–${wx.years[1]}.`));
+  }
+
+  // ---------- planner ----------
+  const plan = { month: ((new Date().getMonth() + 1) % 12) + 1, first: null, length: null, years: "recent" };
+
+  function fillSelect(sel, values, label, current) {
+    clear(sel);
+    values.forEach((v) => {
+      const o = el("option", { value: String(v) }, label(v));
+      if (String(v) === String(current)) o.selected = true;
+      sel.appendChild(o);
+    });
+  }
+
+  function initPlanner(m) {
+    const form = $("planner");
+    if (!m.planner) { form.hidden = true; return; }
+    form.hidden = false;
+    const t = m.planner.timing;
+    if (!t.first.includes(plan.first)) plan.first = t.default[0];
+    if (!t.length.includes(plan.length)) plan.length = t.default[1];
+    fillSelect($("pl-month"), d3.range(1, 13), (v) => MONTHS[v - 1], plan.month);
+    fillSelect($("pl-first"), t.first, (v) => `${v} days`, plan.first);
+    fillSelect($("pl-length"), t.length, (v) => `${v} days`, plan.length);
+    $("pl-recent-n").textContent = m.planner.recent_years;
+  }
+
+  function readNumber(id, { min, allowEmpty }) {
+    const input = $(id); const raw = input.value.trim();
+    input.removeAttribute("aria-invalid");
+    if (raw === "") return allowEmpty ? null : undefined;
+    const v = Number(raw);
+    if (!Number.isFinite(v) || v < min || (min > 0 && v === 0)) { input.setAttribute("aria-invalid", "true"); return NaN; }
+    return v;
+  }
+
+  function renderPlanner(m, p) {
+    const out = $("pl-result"); clear(out);
+    if (!m.planner) {
+      out.appendChild(el("p", { class: "warn" }, `Not enough history at ${state.market} for the planner (needs ${5}+ full years). Pick a market with more years.`));
+      clear($("chart-plan")); table("table-plan", [], []);
+      return;
+    }
+    const grid = m.planner.grid[`${plan.first}-${plan.length}`];
+    const which = plan.years;
+    const latest = parseInt(m.last.slice(0, 4), 10);
+    const inWindow = (y) => which === "all" || y > latest - m.planner.recent_years;
+    const cell = grid[plan.month];
+    const s = cell[which];
+    const harvest = cell.harvest_months.map((h) => MONTHS[h - 1]).join("–");
+
+    const cost = readNumber("pl-cost", { min: 1, allowEmpty: true });
+    const yld = readNumber("pl-yield", { min: 1, allowEmpty: true });
+    const sell = readNumber("pl-sell", { min: 0, allowEmpty: true }) ?? 0;
+    let be = null;
+    if ([cost, yld, sell].some((v) => Number.isNaN(v))) {
+      out.appendChild(el("p", { class: "warn", role: "alert" }, "Cost and yield must be numbers above zero; selling cost can be zero."));
+    } else if (cost != null && yld != null) {
+      be = cost / yld + sell;  // same rule as farmiq_data.planner.break_even_price
+    }
+
+    const span = which === "all" ? "all years" : `the last ${m.planner.recent_years} years`;
+    out.appendChild(el("p", {}, `Transplant in ${MONTHS[plan.month - 1]} → harvest in ${harvest}.`));
+    if (!s) {
+      out.appendChild(el("p", { class: "warn" }, `Not enough ${which === "all" ? "" : "recent "}years with prices in ${harvest} at this market to say (needs 5).${which === "recent" ? " Try “All years”." : ""}`));
+    } else {
+      const ptxt = el("p");
+      ptxt.append(`In ${span} (${s.n} years, ${s.first_year}–${s.last_year}), the mandi price in those months was `,
+        el("strong", {}, fmt.inr(s.p10)), " in a bad year, ", el("strong", {}, fmt.inr(s.p50)), " typically, and ",
+        el("strong", {}, fmt.inr(s.p90)), " in a good year (per kg).");
+      out.appendChild(ptxt);
+      if (be != null) {
+        const ys = cell.years.filter(([y]) => inWindow(y)).map(([, v]) => v);
+        const k = ys.filter((v) => v >= be).length;
+        const bp = el("p");
+        bp.append("Your break-even: ", el("strong", {}, fmt.inr(be) + "/kg"),
+          `. Harvest-window prices were at or above it in `, el("strong", {}, `${k} of ${ys.length} years`), ".");
+        out.appendChild(bp);
+      } else {
+        out.appendChild(el("p", { class: "warn" }, "Enter your cost per acre and marketable yield to see your break-even price."));
+      }
+    }
+
+    // Chart: every transplant month; the chosen one emphasised, the rest muted.
+    const data = d3.range(1, 13).map((tm) => ({ tm, ...(grid[tm][which] || {}), harvest: grid[tm].harvest_months.map((h) => MONTHS[h - 1]).join("–") }))
+      .filter((d) => d.p50 != null);
+    const w = width("chart-plan");
+    const top = d3.max([...data.map((d) => d.p90), be || 0]) * 1.1 || 10;
+    const chosen = data.filter((d) => d.tm === plan.month);
+    const others = data.filter((d) => d.tm !== plan.month);
+    const tipOpts = {
+      channels: {
+        Transplant: (d) => MONTHS[d.tm - 1], Harvest: "harvest",
+        "Bad year": (d) => fmt.inr(d.p10) + "/kg", Typical: (d) => fmt.inr(d.p50) + "/kg",
+        "Good year": (d) => fmt.inr(d.p90) + "/kg", Years: "n",
+      },
+      tip: { format: { x: false, y: false } },
+    };
+    mount("chart-plan", Plot.plot({
+      ...base(p, w), height: 310, marginLeft: 48, marginBottom: 44,
+      x: { ...monthAxis, domain: d3.range(1, 13), type: "band", label: "Transplant month →", labelAnchor: "right", labelOffset: 38 },
+      y: { label: "↑ Harvest-window price, ₹/kg", grid: true, domain: [0, top] },
+      marks: [
+        Plot.ruleY([0], { stroke: p.axis }),
+        Plot.ruleX(others, { x: "tm", y1: "p10", y2: "p90", strokeWidth: 6, strokeLinecap: "round", stroke: p.muted, strokeOpacity: 0.3 }),
+        Plot.ruleX(chosen, { x: "tm", y1: "p10", y2: "p90", strokeWidth: 6, strokeLinecap: "round", stroke: p.s[0], strokeOpacity: 0.45 }),
+        ...(be != null ? [
+          Plot.ruleY([be], { stroke: p.ink, strokeWidth: 1.5 }),
+          Plot.text([be], { frameAnchor: "left", y: (d) => d, text: () => `Your break-even ${fmt.inr(be)}`,
+            dx: 4, dy: -9, textAnchor: "start", fill: p.ink, fontSize: 11, stroke: p.surface, strokeWidth: 3, paintOrder: "stroke" }),
+        ] : []),
+        Plot.dot(others, { x: "tm", y: "p50", r: 5, fill: p.muted, stroke: p.surface, strokeWidth: 2, ...tipOpts }),
+        Plot.dot(chosen, { x: "tm", y: "p50", r: 7, fill: p.s[0], stroke: p.surface, strokeWidth: 2, ...tipOpts }),
+      ],
+    }));
+    table("table-plan", ["Transplant", "Harvest", "Bad year (P10)", "Typical (P50)", "Good year (P90)", "Years"],
+      d3.range(1, 13).map((tm) => {
+        const c = grid[tm]; const v = c[which];
+        return [MONTHS[tm - 1], c.harvest_months.map((h) => MONTHS[h - 1]).join("–"),
+          fmt.inr(v?.p10), fmt.inr(v?.p50), fmt.inr(v?.p90), v ? String(v.n) : "too few"];
+      }));
+  }
+
+  function bindPlanner() {
+    const rerender = () => { const m = current(); if (m) renderPlanner(m, palette()); };
+    $("pl-month").addEventListener("change", (e) => { plan.month = +e.target.value; rerender(); });
+    $("pl-first").addEventListener("change", (e) => { plan.first = +e.target.value; rerender(); });
+    $("pl-length").addEventListener("change", (e) => { plan.length = +e.target.value; rerender(); });
+    document.querySelectorAll('input[name="pl-years"]').forEach((r) =>
+      r.addEventListener("change", (e) => { plan.years = e.target.value; rerender(); }));
+    ["pl-cost", "pl-yield", "pl-sell"].forEach((id) => $(id).addEventListener("input", rerender));
+    $("planner").addEventListener("submit", (e) => e.preventDefault());
+  }
+
   // ---------- compare ----------
   function initCompare() {
     const ms = markets();
@@ -378,7 +592,8 @@
     $("coverage").textContent =
       `${state.market} · ${m.district} district · ${fmt.int(m.n_days)} price days, ${m.first.slice(0, 4)}–${m.last.slice(0, 4)} · ${m.full_years} full years usable`;
     verdictCards(m);
-    seasonChart(m, p); heatChart(m, p); historyChart(m, p); annualChart(m, p); arrivalsChart(m, p); volChart(m, p);
+    initPlanner(m); renderPlanner(m, p);
+    seasonChart(m, p); heatChart(m, p); historyChart(m, p); annualChart(m, p); arrivalsChart(m, p); weatherCard(m, p); volChart(m, p);
     renderCompare();
     document.querySelectorAll("#arr-h").forEach((h) => (h.textContent =
       `More ${state.commodity === "onion" ? "onions" : "tomatoes"} arriving, lower price?`));
@@ -408,6 +623,7 @@
       box.appendChild(el("p", { role: "alert" }, `Sorry, the data could not be loaded. ${err.message}`));
       return;
     }
+    bindPlanner();
     $("commodity").addEventListener("change", (e) => selectCommodity(e.target.value));
     $("market").addEventListener("change", (e) => {
       state.market = e.target.value;

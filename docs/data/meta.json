@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-18T15:07:43+00:00",
+ "generated_at": "2026-11-18T15:23:40+00:00",
  "date_range": [
   "2003-01-04",
   "2025-10-30"
@@ -17,8 +17,8 @@
   "missing_price": 9
  },
  "source_check": {
-  "n_matched": 3226,
-  "share_equal": 1.0,
+  "n_matched": 4309,
+  "share_equal": 0.9997679275934092,
   "median_abs_diff_inr_quintal": 0.0,
   "files": [
    "tomato_MH_2021.csv",
@@ -32,5 +32,5 @@
   "min_months_per_year": 9,
   "boom_bust_r": 0.3
  },
- "credit": "Price and arrival data: Agmarknet (Directorate of Marketing & Inspection, GoI), via the CEDA Agri Market API, Centre for Economic Data and Analysis, Ashoka University."
+ "credit": "Price and arrival data: Agmarknet (Directorate of Marketing & Inspection, GoI), via the CEDA Agri Market API, Centre for Economic Data and Analysis, Ashoka University. Weather: Open-Meteo historical weather API (ERA5 reanalysis), CC BY 4.0."
 }

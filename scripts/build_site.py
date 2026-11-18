@@ -23,15 +23,28 @@ from farmiq_data.normalise import normalise_ceda_prices, parse_agmarknet_csv  # 
 from farmiq_data.patterns import (  # noqa: E402
     annual_change_autocorrelation,
     month_summary,
+    monthly_medians,
     seasonal_index,
     volatility_by_month,
 )
+from farmiq_data.planner import harvest_offsets, window_prices, window_summary  # noqa: E402
 from farmiq_data.report import (  # noqa: E402
     arrivals_price_correlation,
     boom_bust_verdict,
     compare_sources,
     seasonality_verdict,
+    weather_verdict,
 )
+from farmiq_data.weather import (  # noqa: E402
+    lagged_correlation,
+    monthly_weather,
+    parse_open_meteo,
+    price_surprise,
+    weather_anomalies,
+)
+
+WEATHER_RAW = ROOT / "data/raw/weather"
+WEATHER_LAGS = [0, 1, 2, 3]
 
 RAW = ROOT / "data/raw/ceda"
 OUT = ROOT / "docs/data"
@@ -39,6 +52,39 @@ COMMODITIES = {78: "Tomato", 23: "Onion"}
 MIN_YEARS_FOR_VERDICT = 8
 THRESHOLD = 0.75
 KNOWN_KEYS = {"date", "commodity_id", "census_state_id", "census_district_id", "market_id"}
+
+# Planner crop-timing options (days from transplant to first harvest; days of harvesting).
+# These are typical ranges the viewer picks from, not facts about any farm.
+TIMING = {
+    "Tomato": {"first": [60, 75, 90], "length": [30, 60, 90], "default": [75, 60]},
+    "Onion": {"first": [90, 105, 120], "length": [15, 30], "default": [105, 30]},
+}
+PLANNER_MIN_FULL_YEARS = 5
+RECENT_YEARS = 10
+
+
+def planner_for(name: str, prices_one_market: pd.DataFrame) -> dict:
+    """Harvest-window prices for every transplant month and timing option."""
+    t = TIMING[name]
+    monthly = monthly_medians(prices_one_market)[["year", "month", "monthly_median"]]
+    monthly = monthly.rename(columns={"monthly_median": "median"})
+    latest_year = int(prices_one_market["date"].dt.year.max())
+    grid = {}
+    for first in t["first"]:
+        for length in t["length"]:
+            months = {}
+            for tm in range(1, 13):
+                offsets = harvest_offsets(first, length, transplant_month=tm)
+                w = window_prices(monthly, tm, offsets)
+                s = window_summary(w, recent_years=RECENT_YEARS, min_years=5, latest_year=latest_year)
+                months[tm] = {
+                    "harvest_months": [((tm - 1 + k) % 12) + 1 for k in offsets],
+                    "years": [[int(y), _r(p, 2)] for y, p in w[["transplant_year", "price"]].itertuples(index=False)],
+                    "recent": {k: _r(v, 2) for k, v in s["recent"].items()} if s["recent"] else None,
+                    "all": {k: _r(v, 2) for k, v in s["all"].items()} if s["all"] else None,
+                }
+            grid[f"{first}-{length}"] = months
+    return {"timing": t, "recent_years": RECENT_YEARS, "grid": grid}
 
 
 def _r(x, nd=3):
@@ -61,6 +107,36 @@ DISTRICT_DISPLAY = {
     "Bid": "Beed",
     "Osmanabad": "Dharashiv (Osmanabad)",
 }
+
+
+DISPLAY_TO_CENSUS = {v: k for k, v in DISTRICT_DISPLAY.items()}
+
+
+def load_weather() -> dict[str, pd.DataFrame]:
+    """Monthly weather with anomalies, keyed by district display name."""
+    out = {}
+    for f in sorted(WEATHER_RAW.glob("*.json")):
+        payload = json.loads(f.read_text(encoding="utf-8"))
+        out[DISTRICT_DISPLAY.get(payload["district"], payload["district"])] = weather_anomalies(
+            monthly_weather(parse_open_meteo(payload)))
+    return out
+
+
+def weather_for(index_one_market: pd.DataFrame, wa: pd.DataFrame) -> dict:
+    """Weather normals for the district, and how weather anomalies line up with price surprises."""
+    normals = wa.groupby("month").agg(rain=("rain_mm", "mean"), tmax=("tmax_c", "mean")).reset_index()
+    surprise = price_surprise(index_one_market[["year", "month", "index"]])
+    corrs = []
+    for var, col in (("rain", "rain_anom"), ("heat", "tmax_anom")):
+        for lag in WEATHER_LAGS:
+            res = lagged_correlation(surprise, wa, col, lag_months=lag, min_n=60)
+            corrs.append({"var": var, "lag": lag, "r": _r(res[0]) if res else None, "n": res[1] if res else 0})
+    return {
+        "normals": [[int(m), _r(r, 0), _r(t, 1)] for m, r, t in normals.itertuples(index=False)],
+        "years": [int(wa["year"].min()), int(wa["year"].max())],
+        "corr": corrs,
+        "verdict": weather_verdict(corrs),
+    }
 
 
 def market_names() -> dict[int, str]:
@@ -112,7 +188,7 @@ def monthly_arrivals(a: pd.DataFrame) -> pd.DataFrame:
     return a.groupby(["market", "commodity", "year", "month"])["arrivals"].sum().reset_index()
 
 
-def build_commodity(name: str, prices: pd.DataFrame, arrivals: pd.DataFrame) -> dict:
+def build_commodity(name: str, prices: pd.DataFrame, arrivals: pd.DataFrame, weather: dict) -> dict:
     p = prices[prices["commodity"] == name]
     idx = seasonal_index(p)
     summ = month_summary(idx, min_years=5)
@@ -153,6 +229,9 @@ def build_commodity(name: str, prices: pd.DataFrame, arrivals: pd.DataFrame) -> 
             "arrivals": [[int(y), int(m), _r(v, 1)]
                          for y, m, v in am[["year", "month", "arrivals"]].itertuples(index=False)],
             "arrivals_price": ({"r": _r(arr_corr[0]), "n_months": arr_corr[1]} if arr_corr else None),
+            "planner": planner_for(name, g) if mi["year"].nunique() >= PLANNER_MIN_FULL_YEARS else None,
+            "weather": (weather_for(mi, weather[g["district"].iloc[0]])
+                        if len(mi) and g["district"].iloc[0] in weather else None),
         }
     return {"commodity": name, "markets": markets}
 
@@ -161,6 +240,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     prices, rejected = load_prices()
     arrivals = load_arrivals()
+    weather = load_weather()
     logging.info("prices: %d clean, %d rejected | arrivals: %d rows", len(prices), len(rejected), len(arrivals))
 
     # Cross-check against Agmarknet downloads where we have them.
@@ -176,7 +256,7 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     available = []
     for name in COMMODITIES.values():
-        data = build_commodity(name, prices, arrivals)
+        data = build_commodity(name, prices, arrivals, weather)
         (OUT / f"{name.lower()}.json").write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
         logging.info("%s: %d markets", name, len(data["markets"]))
         if data["markets"]:
@@ -194,7 +274,8 @@ def main() -> None:
         "rules": {"min_years_for_verdict": MIN_YEARS_FOR_VERDICT, "reliable_share": THRESHOLD,
                   "min_days_per_month": 5, "min_months_per_year": 9, "boom_bust_r": 0.3},
         "credit": "Price and arrival data: Agmarknet (Directorate of Marketing & Inspection, GoI), "
-                  "via the CEDA Agri Market API, Centre for Economic Data and Analysis, Ashoka University.",
+                  "via the CEDA Agri Market API, Centre for Economic Data and Analysis, Ashoka University. "
+                  "Weather: Open-Meteo historical weather API (ERA5 reanalysis), CC BY 4.0.",
     }
     (OUT / "meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
 
