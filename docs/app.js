@@ -568,8 +568,10 @@
   // ---------- page ----------
   function about() {
     const m = state.meta; const box = $("about"); clear(box);
+    const src = m.sources || {};
     const items = [
       `Daily wholesale (mandi) prices for ${m.districts.join(", ")} districts, ${m.date_range[0]} to ${m.date_range[1]}: ${fmt.int(m.n_price_days)} market-days after cleaning.`,
+      ...(src.agmarknet ? [`Sources by date: CEDA (a copy of Agmarknet) ${src.ceda[0]} to ${src.ceda[1]}; Agmarknet 2.0 downloads ${src.agmarknet[0]} to ${src.agmarknet[1]}, added only after CEDA's last date so nothing is counted twice. Arrivals are from CEDA only.`] : []),
       ...(m.combined_market_days ? [`${fmt.int(m.combined_market_days)} market-days had several lots or varieties reported (the source does not say which); for those days the median of their modal prices is used, not one picked at random.`] : []),
       `Records removed (counted, not hidden): ${Object.entries(m.rejected).map(([k, v]) => `${fmt.int(v)} ${REASONS[k] || k.replaceAll("_", " ")}`).join("; ") || "none"}.`,
       `A month counts only with at least ${m.rules.min_days_per_month} reporting days, and a year only with at least ${m.rules.min_months_per_year} such months. A verdict needs ${m.rules.min_years_for_verdict}+ years; a month is "reliably" dear or cheap if it was so in ${Math.round(m.rules.reliable_share * 100)}% of years.`,

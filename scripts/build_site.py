@@ -19,7 +19,12 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from farmiq_data.normalise import normalise_ceda_prices, parse_agmarknet_csv  # noqa: E402
+from farmiq_data.normalise import (  # noqa: E402
+    append_after,
+    normalise_agmarknet,
+    normalise_ceda_prices,
+    parse_agmarknet_csv,
+)
 from farmiq_data.patterns import (  # noqa: E402
     annual_change_autocorrelation,
     month_summary,
@@ -32,6 +37,7 @@ from farmiq_data.report import (  # noqa: E402
     arrivals_price_correlation,
     boom_bust_verdict,
     compare_sources,
+    market_key,
     seasonality_verdict,
     weather_verdict,
 )
@@ -110,6 +116,19 @@ DISTRICT_DISPLAY = {
 
 
 DISPLAY_TO_CENSUS = {v: k for k, v in DISTRICT_DISPLAY.items()}
+
+# Agmarknet 2.0 uses today's district names; map them to the same display names.
+AGM_DISTRICTS = {
+    "Ahilyanagar": "Ahilyanagar (Ahmednagar)",
+    "Chattrapati Sambhajinagar": "Chh. Sambhajinagar (Aurangabad)",
+    "Chhatrapati Sambhajinagar": "Chh. Sambhajinagar (Aurangabad)",
+    "Beed": "Beed",
+    "Dharashiv": "Dharashiv (Osmanabad)",
+    "Jalna": "Jalna",
+    "Nashik": "Nashik",
+    "Pune": "Pune",
+    "Solapur": "Solapur",
+}
 
 
 def load_weather() -> dict[str, pd.DataFrame]:
@@ -243,15 +262,28 @@ def main() -> None:
     weather = load_weather()
     logging.info("prices: %d clean, %d rejected | arrivals: %d rows", len(prices), len(rejected), len(arrivals))
 
-    # Cross-check against Agmarknet downloads where we have them.
+    # Agmarknet downloads: cross-check CEDA where they overlap, and extend the
+    # series past CEDA's last date (CEDA updates monthly and lags).
     agm_files = sorted((ROOT / "raw").glob("*.csv"))
     comparison = None
+    sources = {"ceda": [prices["date"].min().date().isoformat(), prices["date"].max().date().isoformat()]}
     if agm_files:
         agm = pd.concat([parse_agmarknet_csv(f) for f in agm_files], ignore_index=True)
         # Agmarknet reports one row per variety/grade; compare on its single-variety market-days only.
-        agm = agm[~agm.duplicated(["market", "commodity", "date"], keep=False)]
-        comparison = compare_sources(prices, agm) | {"files": [f.name for f in agm_files]}
+        single = agm[~agm.duplicated(["market", "commodity", "date"], keep=False)]
+        comparison = compare_sources(prices, single) | {"files": [f.name for f in agm_files]}
         logging.info("CEDA vs Agmarknet: %s", comparison)
+
+        agm = agm[agm["district"].isin(AGM_DISTRICTS)]
+        known = {market_key(n): n for n in prices["market"].dropna().unique()}
+        agm_clean, agm_rej = normalise_agmarknet(agm, known, AGM_DISTRICTS)
+        before = len(prices)
+        prices = append_after(prices, agm_clean)
+        added = prices[prices["source"] == "agmarknet"]
+        rejected = pd.concat([rejected, agm_rej[agm_rej["date"].isin(added["date"])]], ignore_index=True)
+        if len(added):
+            sources["agmarknet"] = [added["date"].min().date().isoformat(), added["date"].max().date().isoformat()]
+        logging.info("Agmarknet extension: %d market-days added after CEDA's last date", len(prices) - before)
 
     OUT.mkdir(parents=True, exist_ok=True)
     available = []
@@ -266,6 +298,7 @@ def main() -> None:
     meta = {
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "date_range": [prices["date"].min().date().isoformat(), prices["date"].max().date().isoformat()],
+        "sources": sources,
         "districts": sorted(prices["district"].dropna().unique().tolist()),
         "commodities": available,
         "n_price_days": int(len(prices)),

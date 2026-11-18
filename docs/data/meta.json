@@ -1,9 +1,19 @@
 {
- "generated_at": "2026-11-18T15:52:15+00:00",
+ "generated_at": "2026-11-18T16:28:50+00:00",
  "date_range": [
   "2003-01-01",
-  "2025-10-30"
+  "2026-11-18"
  ],
+ "sources": {
+  "ceda": [
+   "2003-01-01",
+   "2025-10-30"
+  ],
+  "agmarknet": [
+   "2025-10-31",
+   "2026-11-18"
+  ]
+ },
  "districts": [
   "Ahilyanagar (Ahmednagar)",
   "Beed",
@@ -18,10 +28,10 @@
   "tomato",
   "onion"
  ],
- "n_price_days": 214175,
- "combined_market_days": 8893,
+ "n_price_days": 232420,
+ "combined_market_days": 9888,
  "rejected": {
-  "duplicate": 129,
+  "duplicate": 162,
   "missing_price": 67
  },
  "source_check": {
@@ -29,8 +39,12 @@
   "share_equal": 0.9998993761320185,
   "median_abs_diff_inr_quintal": 0.0,
   "files": [
+   "onion_MH_2025-10-31_2026-10-30.csv",
+   "onion_MH_2026-10-31_2026-11-18.csv",
    "tomato_MH_2021.csv",
-   "tomato_MH_2022.csv"
+   "tomato_MH_2022.csv",
+   "tomato_MH_2025-10-31_2026-10-30.csv",
+   "tomato_MH_2026-10-31_2026-11-18.csv"
   ]
  },
  "rules": {
