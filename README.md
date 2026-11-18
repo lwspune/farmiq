@@ -10,6 +10,13 @@ questions:
 - **Supply:** do months with more produce arriving have lower prices?
 - **Risk:** in which months do prices swing most?
 - **Markets:** do nearby markets share the same seasonal shape?
+- **Weather:** do unusually wet or hot months line up with price surprises later?
+
+It also has a **planting-window planner**: pick a transplant month and crop
+timing, and see the low / typical / high mandi price in the harvest months that
+followed in past years. Enter your own cost per acre, marketable yield and
+selling cost to see your break-even price and how many past years cleared it.
+Nothing is pre-filled; the page never invents cost or yield figures.
 
 Results are shown on a static site in [`docs/`](docs/) (served by GitHub Pages).
 It is the first, data-only step of the FarmIQ crop-planning idea.
@@ -23,6 +30,7 @@ It is the first, data-only step of the FarmIQ crop-planning idea.
 |---|---|---|---|
 | [CEDA Agri Market API](https://api.ceda.ashoka.edu.in/) (Ashoka University) | Daily min / max / modal price and arrivals per market | 2003 to latest monthly update | Mirrors Agmarknet; free for non-commercial use with credit |
 | [Agmarknet 2.0](https://agmarknet.gov.in/) Daily Price and Arrival report | Daily prices per market, variety and grade | 2021 onward | Downloaded by hand (the site uses a CAPTCHA); used to cross-check CEDA |
+| [Open-Meteo historical weather](https://open-meteo.com/en/docs/historical-weather-api) (ERA5) | Daily rainfall and maximum temperature at each district centre | 2003 onward | CC BY 4.0; free for non-commercial use |
 
 Districts planned: Ahilyanagar (Ahmednagar), Chh. Sambhajinagar (Aurangabad),
 Beed, Jalna, Nashik, Pune, Solapur, Dharashiv (Osmanabad).
@@ -36,7 +44,8 @@ Agmarknet's exactly on every day.
 
 **Credit:** Price and arrival data: Agmarknet (Directorate of Marketing &
 Inspection, Government of India), via the CEDA Agri Market API, Centre for
-Economic Data and Analysis, Ashoka University.
+Economic Data and Analysis, Ashoka University. Weather: Open-Meteo historical
+weather API (ERA5 reanalysis), CC BY 4.0.
 
 Raw downloads are **not** committed (see `.gitignore`); only computed summaries
 in `docs/data/` are.
@@ -58,6 +67,16 @@ Code in `farmiq_data/`:
   summaries, year-to-year autocorrelation, within-month volatility.
 - `report.py`: verdict rules and the cross-source check.
 - `ceda.py`: API client (key from `CEDA_API_KEY` or a local `.env`, never logged).
+- `planner.py`: harvest months for a transplant month and crop timing (a month
+  counts when 10+ harvest days fall in it), harvest-window prices per year,
+  low/typical/high over the last 10 years or all years, break-even price.
+- `weather.py`: Open-Meteo client, monthly rainfall and heat anomalies, and
+  their lagged correlation with "price surprises" (a month's price versus the
+  usual level for that month).
+
+Findings so far (tomato): a strong seasonal pattern (June-July dear,
+January-April cheap), a boom-and-bust tendency between years, and only a weak
+link to local weather. Prices are mostly set by supply from across India.
 
 ### Rules behind the verdicts
 
@@ -79,6 +98,7 @@ python -m venv .venv
 echo CEDA_API_KEY=your-key > .env                     # free key from api.ceda.ashoka.edu.in
 .venv/Scripts/python -m pytest                        # tests
 .venv/Scripts/python scripts/fetch_ceda.py            # slow on purpose (API rate limit)
+.venv/Scripts/python scripts/fetch_weather.py
 .venv/Scripts/python scripts/build_site.py
 .venv/Scripts/python -m http.server 8765 --directory docs   # open http://127.0.0.1:8765
 ```
