@@ -93,10 +93,11 @@ class CedaClient:
         })
 
     def _series(self, path, commodity_id, state_id, district_ids, from_date, to_date):
-        return self._call("POST", path, {
-            "commodity_id": commodity_id, "state_id": state_id, "district_id": list(district_ids),
-            "from_date": from_date, "to_date": to_date,
-        })
+        """`district_ids=None` asks for the state level (state_id 0 = all India)."""
+        body = {"commodity_id": commodity_id, "state_id": state_id, "from_date": from_date, "to_date": to_date}
+        if district_ids is not None:
+            body["district_id"] = list(district_ids)
+        return self._call("POST", path, body)
 
     def prices(self, commodity_id, state_id, district_ids, from_date, to_date) -> list[dict]:
         return self._series("/agmarknet/prices", commodity_id, state_id, district_ids, from_date, to_date)
@@ -119,6 +120,26 @@ def fetch_series(
     out.write_text(json.dumps({
         "request": {"indicator": indicator, "commodity_id": commodity_id, "state_id": state_id,
                     "district_id": [district_id], "from_date": from_date, "to_date": to_date},
+        "fetched_at": datetime.now(UTC).isoformat(),
+        "rows": rows,
+    }), encoding="utf-8")
+    return out
+
+
+def fetch_state_series(
+    client: CedaClient, out_dir: Path, indicator: str, commodity_id: int, state_id: int,
+    from_date: str, to_date: str,
+) -> Path:
+    """Fetch one commodity at state level (state_id 0 = all India). Skips files already saved."""
+    out = Path(out_dir) / indicator / f"c{commodity_id}_s{state_id}_state_{from_date}_{to_date}.json"
+    if out.exists():
+        return out
+    fetch = client.prices if indicator == "prices" else client.quantities
+    rows = fetch(commodity_id, state_id, None, from_date, to_date)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps({
+        "request": {"indicator": indicator, "commodity_id": commodity_id, "state_id": state_id,
+                    "from_date": from_date, "to_date": to_date},
         "fetched_at": datetime.now(UTC).isoformat(),
         "rows": rows,
     }), encoding="utf-8")
