@@ -77,6 +77,41 @@ def price_surprise(index_df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def season_rain_pct(
+    monthly: pd.DataFrame, months=(6, 7, 8, 9), base_years: tuple[int, int] = (2003, 2025)
+) -> pd.Series:
+    """Each year's rainfall over `months` as a % of the average over `base_years`.
+    Years missing any of the months are left out rather than under-counted."""
+    m = monthly[monthly["month"].isin(months)]
+    complete = m.groupby("year")["month"].nunique() == len(months)
+    totals = m.groupby("year")["rain_mm"].sum()[complete]
+    base = totals.loc[base_years[0]:base_years[1]].mean()
+    return totals / base * 100
+
+
+def relative_to_neighbours(series: pd.Series, window: int = 7) -> pd.Series:
+    """Value divided by the median of the surrounding calendar years (centred window),
+    so slow trends such as inflation do not look like shocks."""
+    full = series.reindex(range(int(series.index.min()), int(series.index.max()) + 1))
+    med = full.rolling(window, center=True, min_periods=3).median()
+    return (full / med).dropna()
+
+
+def after_dry_years(rain_pct: pd.Series, next_rel: pd.Series, threshold: float = 85) -> dict:
+    """Next-season price (relative to neighbouring years) after dry vs normal monsoons."""
+    both = pd.concat([rain_pct.rename("rain"), next_rel.rename("rel")], axis=1).dropna()
+    dry = both[both["rain"] < threshold]
+    normal = both[both["rain"] >= threshold]
+    return {
+        "dry_years": [[int(y), round(float(r), 1), round(float(v), 2)] for y, (r, v) in dry.iterrows()],
+        "median_after_dry": float(dry["rel"].median()) if len(dry) else None,
+        "median_after_normal": float(normal["rel"].median()) if len(normal) else None,
+        "n_dry": int(len(dry)),
+        "n_normal": int(len(normal)),
+        "dry_higher": int((dry["rel"] > 1).sum()),
+    }
+
+
 def lagged_correlation(surprise: pd.DataFrame, weather: pd.DataFrame, column: str, lag_months: int, min_n: int = 60):
     """Correlation between a weather anomaly and the price surprise `lag_months` later.
 

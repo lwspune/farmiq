@@ -69,6 +69,43 @@ def test_lagged_correlation_finds_weather_that_leads_prices():
     assert abs(r0) < 0.3
 
 
+def test_season_rain_pct_compares_each_year_with_the_base_average():
+    from farmiq_data.weather import season_rain_pct
+    m = pd.DataFrame({"year": [2020, 2020, 2021, 2021, 2022, 2022], "month": [7, 8, 7, 8, 7, 8],
+                      "rain_mm": [100.0, 100.0, 300.0, 300.0, 100.0, 50.0], "tmax_c": 30.0})
+    pct = season_rain_pct(m, months=(7, 8), base_years=(2020, 2021))
+    assert pct[2020] == pytest.approx(50.0)   # 200 vs base average 400
+    assert pct[2021] == pytest.approx(150.0)
+    assert pct[2022] == pytest.approx(37.5)   # outside the base years, still compared with it
+
+
+def test_season_rain_pct_skips_years_missing_a_season_month():
+    from farmiq_data.weather import season_rain_pct
+    m = pd.DataFrame({"year": [2020, 2020, 2021], "month": [7, 8, 7], "rain_mm": 100.0, "tmax_c": 30.0})
+    pct = season_rain_pct(m, months=(7, 8), base_years=(2020, 2021))
+    assert 2021 not in pct.index
+
+
+def test_relative_to_neighbours_removes_the_trend():
+    from farmiq_data.weather import relative_to_neighbours
+    s = pd.Series([10.0, 11.0, 12.0, 30.0, 14.0, 15.0, 16.0], index=range(2010, 2017))
+    rel = relative_to_neighbours(s, window=5)
+    assert rel[2013] > 2.0           # a spike stands out
+    assert rel[2011] == pytest.approx(1.0, abs=0.1)
+
+
+def test_after_dry_years_summarises_the_next_season():
+    from farmiq_data.weather import after_dry_years
+    rain = pd.Series({2010: 70.0, 2011: 100.0, 2012: 60.0, 2013: 110.0, 2014: 95.0})
+    nxt = pd.Series({2010: 1.5, 2011: 1.0, 2012: 2.0, 2013: 0.9, 2014: 1.1})
+    out = after_dry_years(rain, nxt, threshold=85)
+    assert out["dry_years"] == [[2010, 70.0, 1.5], [2012, 60.0, 2.0]]
+    assert out["median_after_dry"] == pytest.approx(1.75)
+    assert out["median_after_normal"] == pytest.approx(1.0)
+    assert out["n_dry"] == 2 and out["n_normal"] == 3
+    assert out["dry_higher"] == 2
+
+
 def test_lagged_correlation_refuses_short_series():
     weather = _series(range(20)).rename(columns={"v": "rain_anom"})
     surprise = _series(range(20)).rename(columns={"v": "surprise"})
