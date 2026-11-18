@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FarmIQ Price Patterns</title>
+  <meta name="description" content="Do mandi prices for tomato and onion near Newasa, Maharashtra follow a pattern? 20+ years of Agmarknet data, analysed.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="top">
+    <div class="wrap">
+      <h1>FarmIQ <span>Price Patterns</span></h1>
+      <p class="lede">Do tomato and onion prices in mandis around Newasa follow a pattern? Daily wholesale prices since 2003, checked year by year.</p>
+    </div>
+  </header>
+
+  <main id="main" class="wrap">
+    <section class="filters" aria-label="Choose what to analyse">
+      <label>Crop
+        <select id="commodity">
+          <option value="tomato">Tomato</option>
+          <option value="onion">Onion</option>
+        </select>
+      </label>
+      <label>Market
+        <select id="market"></select>
+      </label>
+      <p id="coverage" class="muted" aria-live="polite"></p>
+    </section>
+
+    <section aria-labelledby="answers-h">
+      <h2 id="answers-h">The short answers</h2>
+      <div id="verdicts" class="verdicts"></div>
+      <p class="note">Patterns in past prices are not a forecast. Each answer says how many years it rests on.</p>
+    </section>
+
+    <section class="card" aria-labelledby="season-h">
+      <h2 id="season-h">Which months are expensive?</h2>
+      <p class="muted">Each month's price compared with the same year's average (1.0 = an average month). Dividing by each year's own level removes inflation and boom or bust years, leaving only the shape. Dot = typical year; bar = range in 8 of 10 years.</p>
+      <div id="chart-season" class="chart"></div>
+      <details><summary>Show as table</summary><div id="table-season"></div></details>
+    </section>
+
+    <section class="card" aria-labelledby="heat-h">
+      <h2 id="heat-h">Every year, month by month</h2>
+      <p class="muted">Red = dearer than that year's average, blue = cheaper. If the same columns are red year after year, the pattern is real. Blank = too few reporting days that month or year.</p>
+      <div id="heat-legend" class="legend-ramp" aria-hidden="true"></div>
+      <div id="chart-heat" class="chart"></div>
+      <details><summary>Show as table</summary><div id="table-heat"></div></details>
+    </section>
+
+    <section class="card" aria-labelledby="history-h">
+      <h2 id="history-h">Price history</h2>
+      <p class="muted">Median modal (most common) wholesale price each month, in ₹ per kg. Not the farm-gate price: transport, commission and grading come off this.</p>
+      <div id="chart-history" class="chart"></div>
+      <details><summary>Show as table</summary><div id="table-history"></div></details>
+    </section>
+
+    <section class="card" aria-labelledby="annual-h">
+      <h2 id="annual-h">Boom and bust?</h2>
+      <p class="muted">Average price in each full year. A boom-and-bust cycle shows as high and low years alternating. Missing bars = years with too little data.</p>
+      <div id="chart-annual" class="chart"></div>
+      <details><summary>Show as table</summary><div id="table-annual"></div></details>
+    </section>
+
+    <section class="card" aria-labelledby="arr-h">
+      <h2 id="arr-h">More tomatoes arriving, lower price?</h2>
+      <p class="muted">Each dot is one month. Across: arrivals at this market compared with that year's average. Up: price compared with that year's average.</p>
+      <div id="chart-arrivals" class="chart"></div>
+      <details><summary>Show as table</summary><div id="table-arrivals"></div></details>
+    </section>
+
+    <section class="card" aria-labelledby="vol-h">
+      <h2 id="vol-h">When do prices swing most within a month?</h2>
+      <p class="muted">Typical day-to-day spread of prices within each month (coefficient of variation; 0.3 = prices typically 30% away from the month's average).</p>
+      <div id="chart-vol" class="chart"></div>
+      <details><summary>Show as table</summary><div id="table-vol"></div></details>
+    </section>
+
+    <section class="card" aria-labelledby="cmp-h">
+      <h2 id="cmp-h">Compare markets</h2>
+      <p class="muted">The seasonal shape (typical year) for up to four markets. Pick markets to compare:</p>
+      <div id="compare-picker" class="picker" role="group" aria-label="Markets to compare"></div>
+      <div id="chart-compare" class="chart"></div>
+      <details><summary>Show as table</summary><div id="table-compare"></div></details>
+    </section>
+
+    <section class="card" aria-labelledby="about-h">
+      <h2 id="about-h">About the data</h2>
+      <div id="about"></div>
+    </section>
+  </main>
+
+  <footer class="wrap muted">
+    <p id="credit"></p>
+    <p>Code: <a href="https://github.com/lwspune/farmiq">github.com/lwspune/farmiq</a>. Educational analysis; not financial or agronomic advice.</p>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@observablehq/plot@0.6.16/dist/plot.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
