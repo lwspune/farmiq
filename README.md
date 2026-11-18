@@ -11,6 +11,8 @@ questions:
 - **Risk:** in which months do prices swing most?
 - **Markets:** do nearby markets share the same seasonal shape?
 - **Weather:** do unusually wet or hot months line up with price surprises later?
+- **Dry years:** how this year's monsoon and October rain compare with normal, and
+  what prices did in the season after past dry monsoons (below 85% of normal).
 - **Other states:** when does each state send produce to market, and do unusually
   big or small arrivals elsewhere line up with local price surprises?
 
@@ -96,6 +98,11 @@ Findings so far:
   Shrirampur and tomato at Rahuri against all-India arrivals).
 - Supply calendar: Karnataka sends most tomatoes in June-August, Maharashtra in
   September-October, Madhya Pradesh in October-December.
+- 2026 is a dry year: monsoon rain was 65-87% of normal across the eight
+  districts (Ahilyanagar 67%, 3rd driest since 2003) and October almost rainless.
+  After past dry monsoons, next-season prices were higher at most markets
+  (e.g. onion at Ahmednagar a median 1.7x neighbouring years), but with only 3-7
+  dry years per market and exceptions such as 2015.
 
 ### Rules behind the verdicts
 
