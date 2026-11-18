@@ -1,0 +1,36 @@
+{
+ "generated_at": "2026-11-18T15:07:43+00:00",
+ "date_range": [
+  "2003-01-04",
+  "2025-10-30"
+ ],
+ "districts": [
+  "Ahilyanagar (Ahmednagar)",
+  "Chh. Sambhajinagar (Aurangabad)",
+  "Nashik"
+ ],
+ "commodities": [
+  "tomato"
+ ],
+ "n_price_days": 33546,
+ "rejected": {
+  "missing_price": 9
+ },
+ "source_check": {
+  "n_matched": 3226,
+  "share_equal": 1.0,
+  "median_abs_diff_inr_quintal": 0.0,
+  "files": [
+   "tomato_MH_2021.csv",
+   "tomato_MH_2022.csv"
+  ]
+ },
+ "rules": {
+  "min_years_for_verdict": 8,
+  "reliable_share": 0.75,
+  "min_days_per_month": 5,
+  "min_months_per_year": 9,
+  "boom_bust_r": 0.3
+ },
+ "credit": "Price and arrival data: Agmarknet (Directorate of Marketing & Inspection, GoI), via the CEDA Agri Market API, Centre for Economic Data and Analysis, Ashoka University."
+}
