@@ -95,10 +95,10 @@ h2 { font-size: 1.15rem; margin: 0 0 6px; }
   padding: 12px 0; margin-bottom: 16px;
   background: var(--page); border-bottom: 1px solid var(--border);
 }
-.filters label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--text-secondary); min-width: 0; max-width: 100%; }
+.filters label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--text-secondary); min-width: 0; max-width: min(100%, 420px); }
 .filters select {
   font: inherit; font-size: 1rem; color: var(--text-primary); background: var(--surface-1);
-  border: 1px solid var(--axis); border-radius: 8px; padding: 8px 10px; min-width: 200px; max-width: 100%;
+  border: 1px solid var(--axis); border-radius: 8px; padding: 8px 10px; min-width: 200px; max-width: min(100%, 420px);
 }
 .filters p { margin: 0; flex-basis: 100%; }
 @media (max-width: 600px) {

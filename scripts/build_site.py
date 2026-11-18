@@ -49,10 +49,13 @@ from farmiq_data.supply import (  # noqa: E402
     supply_verdict,
 )
 from farmiq_data.weather import (  # noqa: E402
+    after_dry_years,
     lagged_correlation,
     monthly_weather,
     parse_open_meteo,
     price_surprise,
+    relative_to_neighbours,
+    season_rain_pct,
     weather_anomalies,
 )
 
@@ -188,6 +191,43 @@ def load_weather() -> dict[str, pd.DataFrame]:
     return out
 
 
+# The selling season that follows a monsoon, per crop (months of the next calendar year).
+NEXT_SEASON = {"Onion": ([3, 4, 5, 6, 7, 8], "Mar-Aug next year"), "Tomato": ([1, 2, 3, 4, 5], "Jan-May next year")}
+DRY_THRESHOLD = 85
+
+
+def dry_year_for(prices_one_market: pd.DataFrame, wa: pd.DataFrame, crop: str) -> dict:
+    """This year's monsoon and October rain vs normal, and the market's next-season
+    price after past dry monsoons (relative to neighbouring years)."""
+    current = int(wa["year"].max())
+    monsoon = season_rain_pct(wa, (6, 7, 8, 9), base_years=(2003, current - 1))
+    october = season_rain_pct(wa, (10,), base_years=(2003, current - 1))
+    months, label = NEXT_SEASON[crop]
+    mm = monthly_medians(prices_one_market)
+    mm = mm[mm["month"].isin(months)]
+    enough = mm.groupby("year")["month"].nunique() >= (len(months) + 1) // 2
+    nxt = mm.groupby("year")["monthly_median"].mean()[enough]
+    nxt.index = nxt.index - 1  # season after the monsoon of the previous year
+    rel = relative_to_neighbours(nxt) if len(nxt) >= 5 else pd.Series(dtype=float)
+    after = after_dry_years(monsoon.drop(current, errors="ignore"), rel, DRY_THRESHOLD)
+    ranked = monsoon.sort_values()
+    cur = {
+        "year": current,
+        "monsoon_pct": _r(monsoon.get(current), 0),
+        "rank_driest": int(list(ranked.index).index(current)) + 1 if current in ranked.index else None,
+        "of_years": int(len(ranked)),
+        "october_pct": _r(october.get(current), 0),
+    }
+    return {
+        "monsoon": [[int(y), _r(v, 0)] for y, v in monsoon.items()],
+        "current": cur,
+        "next_label": label,
+        "threshold": DRY_THRESHOLD,
+        "after": {**after, "median_after_dry": _r(after["median_after_dry"], 2),
+                  "median_after_normal": _r(after["median_after_normal"], 2)},
+    }
+
+
 def weather_for(index_one_market: pd.DataFrame, wa: pd.DataFrame) -> dict:
     """Weather normals for the district, and how weather anomalies line up with price surprises."""
     normals = wa.groupby("month").agg(rain=("rain_mm", "mean"), tmax=("tmax_c", "mean")).reset_index()
@@ -297,6 +337,8 @@ def build_commodity(name: str, prices: pd.DataFrame, arrivals: pd.DataFrame, wea
                          for y, m, v in am[["year", "month", "arrivals"]].itertuples(index=False)],
             "arrivals_price": ({"r": _r(arr_corr[0]), "n_months": arr_corr[1]} if arr_corr else None),
             "planner": planner_for(name, g) if mi["year"].nunique() >= PLANNER_MIN_FULL_YEARS else None,
+            "dry": (dry_year_for(g, weather[g["district"].iloc[0]], name)
+                    if g["district"].iloc[0] in weather else None),
             "weather": (weather_for(mi, weather[g["district"].iloc[0]])
                         if len(mi) and g["district"].iloc[0] in weather else None),
             "supply": supply_for(mi, supply) if supply and len(mi) else None,

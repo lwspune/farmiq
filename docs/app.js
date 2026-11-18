@@ -371,6 +371,83 @@
     extra.appendChild(el("p", { class: "note" }, `Weather at the ${m.district} district centre, ${wx.years[0]}–${wx.years[1]}.`));
   }
 
+  // ---------- dry year ----------
+  function ordinal(n) { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+
+  function dryCard(m, p) {
+    const status = $("dry-status"); clear(status);
+    const ids = ["chart-dry-rain", "chart-dry-next"];
+    const dry = m.dry;
+    if (!dry) {
+      status.textContent = "No weather data for this market's district.";
+      ids.forEach((id) => clear($(id))); table("table-dry", [], []);
+      return;
+    }
+    const c = dry.current, a = dry.after;
+    const isDry = c.monsoon_pct != null && c.monsoon_pct < dry.threshold;
+    const p1 = el("p");
+    p1.append(`This year (${c.year}): monsoon rain at the ${m.district} district centre was `,
+      el("strong", {}, `${c.monsoon_pct}% of normal`),
+      c.rank_driest ? ` — the ${ordinal(c.rank_driest)} driest of ${c.of_years} years since 2003.` : ".",
+      c.october_pct != null ? ` October: ${c.october_pct}% of normal.` : "");
+    status.appendChild(p1);
+    const nextName = dry.next_label;
+    const p2 = el("p");
+    if (!a.n_dry) {
+      p2.textContent = `This market has no price history for the season after a past dry monsoon, so there is nothing to compare.`;
+    } else {
+      p2.append(`After ${a.n_dry} past dry monsoon${a.n_dry > 1 ? "s" : ""} (below ${dry.threshold}% of normal), the price here in ${nextName} was higher than in neighbouring years `,
+        el("strong", {}, `${a.dry_higher} time${a.dry_higher === 1 ? "" : "s"} out of ${a.n_dry}`),
+        ` (median ${a.median_after_dry}×, against ${a.median_after_normal ?? "–"}× after normal monsoons).`);
+      if (a.n_dry < 4) p2.append(" That is very few years to go on.");
+    }
+    status.appendChild(p2);
+    if (isDry) status.appendChild(el("p", { class: "warn" }, "In a dry year, check that water will last your crop to harvest before counting on a better price."));
+
+    // Monsoon % by year: current year emphasised, others muted
+    const rain = dry.monsoon.map(([year, pct]) => ({ year, pct, isDry: pct < dry.threshold }));
+    const yrs = rain.map((d) => d.year);
+    const w = width("chart-dry-rain");
+    mount("chart-dry-rain", Plot.plot({
+      ...base(p, w), height: 230, marginLeft: 40,
+      x: { type: "band", domain: yrs, label: null, tickFormat: (y) => (yrs.length > 12 && y % 2 ? "" : String(y)) },
+      y: { label: "% of normal", grid: true, domain: [0, Math.max(160, d3.max(rain, (d) => d.pct) + 10)] },
+      marks: [
+        Plot.barY(rain, { x: "year", y: "pct", rx: 2, insetLeft: 1, insetRight: 1,
+          fill: (d) => (d.year === c.year ? p.s[0] : p.muted), fillOpacity: (d) => (d.year === c.year ? 1 : d.isDry ? 0.75 : 0.35),
+          channels: { Year: "year", Rain: (d) => `${d.pct}% of normal` }, tip: { format: { x: false, y: false, fillOpacity: false } } }),
+        Plot.ruleY([100], { stroke: p.axis }),
+        Plot.ruleY([dry.threshold], { stroke: p.ink2, strokeOpacity: 0.6 }),
+        Plot.text([dry.threshold], { frameAnchor: "left", y: (d) => d, dy: -7, dx: 4, text: () => `dry below ${dry.threshold}%`,
+          textAnchor: "start", fill: p.ink2, fontSize: 11, stroke: p.surface, strokeWidth: 3, paintOrder: "stroke" }),
+      ],
+    }));
+
+    $("dry-next-h").textContent = `Price in ${nextName} after each dry monsoon`;
+    const nxt = a.dry_years.map(([year, pct, rel]) => ({ year: String(year), pct, rel }));
+    if (nxt.length) {
+      const w2 = width("chart-dry-next");
+      mount("chart-dry-next", Plot.plot({
+        ...base(p, w2), height: 220, marginLeft: 44,
+        x: { type: "band", label: "Dry monsoon year →", labelAnchor: "right", padding: nxt.length < 5 ? 0.7 : 0.4 },
+        y: { label: "↑ × neighbouring years", grid: true, domain: [0, Math.max(2, d3.max(nxt, (d) => d.rel) + 0.2)] },
+        marks: [
+          Plot.barY(nxt, { x: "year", y: "rel", fill: p.s[0], rx: 3, insetLeft: 6, insetRight: 6,
+            channels: { "Monsoon": (d) => `${d.pct}% of normal`, "Next season": (d) => `${d.rel}×` },
+            tip: { format: { x: true, y: false } } }),
+          Plot.ruleY([1], { stroke: p.ink, strokeWidth: 1.5 }),
+          Plot.ruleY([0], { stroke: p.axis }),
+        ],
+      }));
+    } else { clear($("chart-dry-next")); }
+
+    table("table-dry", ["Monsoon year", "Rain (% of normal)", `Price ${nextName} (× neighbours)`],
+      rain.slice().reverse().map((r) => {
+        const hit = a.dry_years.find(([y]) => y === r.year);
+        return [String(r.year), `${r.pct}%`, hit ? `${hit[2]}×` : (r.isDry ? "no price data" : "–")];
+      }));
+  }
+
   // ---------- supply from other states ----------
   function supplyCard(m, p) {
     const cal = state.data[state.commodity].supply_calendar;
@@ -681,7 +758,7 @@
       `${state.market} · ${m.district} district · ${fmt.int(m.n_days)} price days, ${m.first.slice(0, 4)}–${m.last.slice(0, 4)} · ${m.full_years} full years usable`;
     verdictCards(m);
     initPlanner(m); renderPlanner(m, p);
-    seasonChart(m, p); heatChart(m, p); historyChart(m, p); annualChart(m, p); arrivalsChart(m, p); weatherCard(m, p); supplyCard(m, p); volChart(m, p);
+    seasonChart(m, p); heatChart(m, p); historyChart(m, p); annualChart(m, p); arrivalsChart(m, p); weatherCard(m, p); dryCard(m, p); supplyCard(m, p); volChart(m, p);
     renderCompare();
     document.querySelectorAll("#arr-h").forEach((h) => (h.textContent =
       `More ${state.commodity === "onion" ? "onions" : "tomatoes"} arriving, lower price?`));
