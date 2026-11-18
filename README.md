@@ -24,8 +24,12 @@ It is the first, data-only step of the FarmIQ crop-planning idea.
 | [CEDA Agri Market API](https://api.ceda.ashoka.edu.in/) (Ashoka University) | Daily min / max / modal price and arrivals per market | 2003 to latest monthly update | Mirrors Agmarknet; free for non-commercial use with credit |
 | [Agmarknet 2.0](https://agmarknet.gov.in/) Daily Price and Arrival report | Daily prices per market, variety and grade | 2021 onward | Downloaded by hand (the site uses a CAPTCHA); used to cross-check CEDA |
 
-Districts: Ahilyanagar (Ahmednagar), Chh. Sambhajinagar (Aurangabad), Beed,
-Jalna, Nashik, Pune, Solapur, Dharashiv (Osmanabad).
+Districts planned: Ahilyanagar (Ahmednagar), Chh. Sambhajinagar (Aurangabad),
+Beed, Jalna, Nashik, Pune, Solapur, Dharashiv (Osmanabad).
+
+**Published so far:** tomato for Ahilyanagar, Chh. Sambhajinagar and Nashik
+(Beed has no tomato prices in the source). Onion and the remaining districts are
+still being downloaded within the API's rate limit.
 
 On 3,226 market-days present in both sources, CEDA's modal price matched
 Agmarknet's exactly on every day.
