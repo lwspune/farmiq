@@ -65,12 +65,38 @@ def test_zero_min_or_max_is_allowed_when_modal_is_valid():
     assert pd.isna(clean.iloc[0]["min_inr_kg"]) and pd.isna(clean.iloc[0]["max_inr_kg"])
 
 
-def test_duplicate_market_day_is_dropped_and_logged():
-    rows = [_row(modal=2000), _row(modal=2100)]
+def test_identical_duplicate_market_day_is_kept_once_and_logged():
+    rows = [_row(modal=2000), _row(modal=2000)]
     clean, rejected = normalise_ceda_prices(rows, "Tomato", MARKETS)
     assert len(clean) == 1
-    assert clean.iloc[0]["modal_inr_quintal"] == 2100  # last record wins (revision)
+    assert clean.iloc[0]["n_rows"] == 1
     assert list(rejected["reason"]) == ["duplicate"]
+
+
+def test_several_lots_on_one_market_day_are_combined_not_picked_arbitrarily():
+    # Same market and day, different lots/varieties (CEDA has no variety field).
+    rows = [_row(mn=250, mx=500, modal=375), _row(mn=150, mx=450, modal=300)]
+    clean, rejected = normalise_ceda_prices(rows, "Onion", MARKETS)
+    assert rejected.empty
+    assert len(clean) == 1
+    row = clean.iloc[0]
+    assert row["modal_inr_quintal"] == pytest.approx(337.5)  # median of the lots' modal prices
+    assert row["min_inr_quintal"] == 150 and row["max_inr_quintal"] == 500
+    assert row["n_rows"] == 2
+
+
+def test_combining_uses_the_median_and_ignores_missing_min_max():
+    rows = [_row(mn=0, mx=0, modal=100), _row(mn=90, mx=400, modal=200), _row(mn=80, mx=350, modal=300)]
+    clean, _ = normalise_ceda_prices(rows, "Onion", MARKETS)
+    row = clean.iloc[0]
+    assert row["modal_inr_quintal"] == pytest.approx(200)
+    assert row["min_inr_quintal"] == 80 and row["max_inr_quintal"] == 400
+    assert row["n_rows"] == 3
+
+
+def test_single_rows_record_one_lot():
+    clean, _ = normalise_ceda_prices([_row()], "Tomato", MARKETS)
+    assert clean.iloc[0]["n_rows"] == 1
 
 
 def test_parses_agmarknet_csv_download(tmp_path: Path):

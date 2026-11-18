@@ -16,7 +16,7 @@ QUINTAL_KG = 100
 COLUMNS = [
     "source", "date", "commodity", "state", "district", "market", "market_id", "variety", "grade",
     "min_inr_quintal", "max_inr_quintal", "modal_inr_quintal",
-    "min_inr_kg", "max_inr_kg", "modal_inr_kg",
+    "min_inr_kg", "max_inr_kg", "modal_inr_kg", "n_rows",
 ]
 
 
@@ -51,9 +51,34 @@ def _split_valid(df: pd.DataFrame, key: list[str]) -> tuple[pd.DataFrame, pd.Dat
     rejected = [df[df["reason"].notna()]]
     valid = df[df["reason"].isna()].drop(columns="reason")
 
-    dup = valid.duplicated(subset=key, keep="last")
-    rejected.append(valid[dup].assign(reason="duplicate"))
-    valid = valid[~dup]
+    # Exact repeats of the same record are dropped (and logged).
+    exact = valid.duplicated(subset=[*key, "min_inr_quintal", "max_inr_quintal", "modal_inr_quintal"], keep="first")
+    rejected.append(valid[exact].assign(reason="duplicate"))
+    valid = valid[~exact]
+
+    # Several different records for one market-day are separate lots or varieties
+    # (the source has no variety field). Rather than pick one arbitrarily, combine
+    # them: median of the modal prices, lowest min and highest max, and record how
+    # many rows were combined.
+    valid = valid.assign(n_rows=valid.groupby(key)["modal_inr_quintal"].transform("size"))
+    single = valid[valid["n_rows"] == 1]
+    multi = valid[valid["n_rows"] > 1]
+    if not multi.empty:
+        pos = multi.assign(
+            min_pos=multi["min_inr_quintal"].where(multi["min_inr_quintal"] > 0),
+            max_pos=multi["max_inr_quintal"].where(multi["max_inr_quintal"] > 0),
+        )
+        first_cols = [c for c in multi.columns if c not in
+                      (*key, "min_inr_quintal", "max_inr_quintal", "modal_inr_quintal", "n_rows")]
+        combined = pos.groupby(key, as_index=False).agg(
+            modal_inr_quintal=("modal_inr_quintal", "median"),
+            min_inr_quintal=("min_pos", "min"),
+            max_inr_quintal=("max_pos", "max"),
+            n_rows=("modal_inr_quintal", "size"),
+            **{c: (c, "first") for c in first_cols},
+        )
+        combined[["min_inr_quintal", "max_inr_quintal"]] = combined[["min_inr_quintal", "max_inr_quintal"]].fillna(0)
+        valid = pd.concat([single, combined[valid.columns]], ignore_index=True)
 
     rej = pd.concat(rejected, ignore_index=True)
     return _finish(valid.reset_index(drop=True)), rej.reset_index(drop=True)

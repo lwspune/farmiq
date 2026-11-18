@@ -269,6 +269,7 @@ def main() -> None:
         "districts": sorted(prices["district"].dropna().unique().tolist()),
         "commodities": available,
         "n_price_days": int(len(prices)),
+        "combined_market_days": int((prices["n_rows"] > 1).sum()),
         "rejected": {k: int(v) for k, v in reasons.items()},
         "source_check": comparison,
         "rules": {"min_years_for_verdict": MIN_YEARS_FOR_VERDICT, "reliable_share": THRESHOLD,
