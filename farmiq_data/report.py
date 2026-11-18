@@ -11,11 +11,19 @@ import re
 import numpy as np
 import pandas as pd
 
+# Same market, different names: Agmarknet 2.0 uses renamed cities and other spellings.
+MARKET_ALIASES = {
+    "ahilyanagar": "ahmednagar",
+    "chandwad": "chandvad",
+    "pimpalgaon baswant": "pimpalgaon",
+}
+
 
 def market_key(name: str) -> str:
     """Normalise a market name so CEDA ('Pune') and Agmarknet ('APMC Pune ') match."""
     key = re.sub(r"\s+", " ", str(name).strip().lower())
-    return re.sub(r"^apmc\s+", "", key)
+    key = re.sub(r"^apmc\s+", "", key)
+    return MARKET_ALIASES.get(key, key)
 
 
 def seasonality_verdict(summary: pd.DataFrame, min_years: int = 8, threshold: float = 0.75) -> dict:
@@ -48,6 +56,20 @@ def boom_bust_verdict(result, threshold: float = 0.3) -> dict:
     else:
         verdict = "none"
     return {"verdict": verdict, "r": round(float(r), 3), "n_pairs": int(n)}
+
+
+def weather_verdict(corrs: list[dict], threshold: float = 0.3) -> dict:
+    """Strongest weather-to-price-surprise correlation across the tested lags.
+
+    Several lags and two variables are tested, so a single |r| just above the
+    threshold should be read as a hint, not proof; the page says so.
+    """
+    valid = [c for c in corrs if c.get("r") is not None]
+    if not valid:
+        return {"verdict": "insufficient", "var": None, "lag": None, "r": None, "n": 0}
+    best = max(valid, key=lambda c: abs(c["r"]))
+    verdict = "link" if abs(best["r"]) >= threshold else "weak"
+    return {"verdict": verdict, "var": best["var"], "lag": best["lag"], "r": best["r"], "n": best["n"]}
 
 
 def _year_relative_log(df: pd.DataFrame, col: str) -> pd.Series:

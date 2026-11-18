@@ -14,7 +14,10 @@ from farmiq_data.report import (
 @pytest.mark.parametrize(
     "raw, key",
     [("APMC Pune ", "pune"), ("Pune", "pune"), ("Junnar(Narayangaon)", "junnar(narayangaon)"),
-     ("APMC  Pimpalgaon Baswant", "pimpalgaon baswant")],
+     # Renamed or differently spelled markets map to one key
+     ("APMC Ahilyanagar", "ahmednagar"), ("Ahmednagar", "ahmednagar"),
+     ("APMC Chandwad", "chandvad"), ("Chandvad", "chandvad"),
+     ("APMC  Pimpalgaon Baswant", "pimpalgaon"), ("Pimpalgaon", "pimpalgaon")],
 )
 def test_market_key_matches_names_across_sources(raw, key):
     assert market_key(raw) == key
@@ -78,6 +81,21 @@ def test_arrivals_price_correlation_refuses_small_samples():
     p = _monthly({(2020, m): 10 for m in range(1, 7)}, "monthly_median")
     a = _monthly({(2020, m): 100 for m in range(1, 7)}, "arrivals")
     assert arrivals_price_correlation(p, a, min_n=24) is None
+
+
+def test_weather_verdict_reports_the_strongest_link():
+    from farmiq_data.report import weather_verdict
+    corrs = [{"var": "rain", "lag": 0, "r": 0.1, "n": 150}, {"var": "heat", "lag": 1, "r": 0.42, "n": 148},
+             {"var": "rain", "lag": 2, "r": -0.2, "n": 146}]
+    v = weather_verdict(corrs)
+    assert v["verdict"] == "link"
+    assert (v["var"], v["lag"], v["r"]) == ("heat", 1, 0.42)
+
+
+def test_weather_verdict_weak_and_insufficient():
+    from farmiq_data.report import weather_verdict
+    assert weather_verdict([{"var": "rain", "lag": 0, "r": 0.12, "n": 150}])["verdict"] == "weak"
+    assert weather_verdict([])["verdict"] == "insufficient"
 
 
 def test_compare_sources_matches_by_market_and_date():
