@@ -35,12 +35,11 @@ It is the first, data-only step of the FarmIQ crop-planning idea.
 Districts planned: Ahilyanagar (Ahmednagar), Chh. Sambhajinagar (Aurangabad),
 Beed, Jalna, Nashik, Pune, Solapur, Dharashiv (Osmanabad).
 
-**Published so far:** tomato for Ahilyanagar, Chh. Sambhajinagar and Nashik
-(Beed has no tomato prices in the source). Onion and the remaining districts are
-still being downloaded within the API's rate limit.
+**Published:** tomato and onion for all eight districts, 2003 to October 2025
+(Beed and Jalna have little or no tomato data in the source).
 
-On 3,226 market-days present in both sources, CEDA's modal price matched
-Agmarknet's exactly on every day.
+On 9,938 market-days present in both sources, CEDA's modal price matched
+Agmarknet's exactly on all but one day.
 
 **Credit:** Price and arrival data: Agmarknet (Directorate of Marketing &
 Inspection, Government of India), via the CEDA Agri Market API, Centre for
@@ -62,7 +61,10 @@ docs/index.html         -> charts (Observable Plot, no build step)
 Code in `farmiq_data/`:
 
 - `normalise.py`: one tidy table; ₹/quintal -> ₹/kg converted once; invalid
-  rows are returned with a reason, never dropped silently.
+  rows are returned with a reason, never dropped silently. When a market reports
+  several lots or varieties for the same day (CEDA has no variety field), they
+  are combined: median of the modal prices, lowest min, highest max, and the
+  number of rows combined is kept.
 - `patterns.py`: seasonal index (each month / that year's average), month
   summaries, year-to-year autocorrelation, within-month volatility.
 - `report.py`: verdict rules and the cross-source check.
@@ -74,9 +76,13 @@ Code in `farmiq_data/`:
   their lagged correlation with "price surprises" (a month's price versus the
   usual level for that month).
 
-Findings so far (tomato): a strong seasonal pattern (June-July dear,
-January-April cheap), a boom-and-bust tendency between years, and only a weak
-link to local weather. Prices are mostly set by supply from across India.
+Findings so far:
+
+- Tomato: a strong seasonal pattern (June-July dear, January-April cheap), a
+  boom-and-bust tendency between years, and only a weak link to local weather.
+- Onion: October-November dear, March-July cheap, and a stronger boom-and-bust
+  cycle between years.
+- Prices are mostly set by supply from across India, not local weather.
 
 ### Rules behind the verdicts
 
