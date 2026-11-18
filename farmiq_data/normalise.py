@@ -114,6 +114,41 @@ def normalise_ceda_prices(
     return _split_valid(out, key=["source", "market_id", "commodity", "date"])
 
 
+def normalise_agmarknet(
+    df: pd.DataFrame, market_names: dict[str, str], district_names: dict[str, str]
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Bring parsed Agmarknet rows into the same tidy table as CEDA.
+
+    `market_names` maps a market key (see report.market_key) to the CEDA market
+    name, so one market keeps one name across sources; unknown markets keep their
+    own name without the "APMC" prefix. Several varieties or grades reported for
+    the same market-day are combined with the same rule as CEDA lots.
+    """
+    from farmiq_data.report import market_key  # local import: report has no dependency back on this module
+
+    out = df.copy()
+    keys = out["market"].map(market_key)
+    cleaned = out["market"].astype(str).str.strip().str.replace(r"(?i)^apmc\s+", "", regex=True)
+    out["market"] = [market_names.get(k, c) for k, c in zip(keys, cleaned, strict=True)]
+    out["district"] = out["district"].map(lambda d: district_names.get(d, d))
+    out["market_id"] = None
+    for col in ("min_inr_quintal", "max_inr_quintal"):
+        out[col] = pd.to_numeric(out[col], errors="coerce").fillna(0)
+    clean, rejected = _split_valid(out, key=["source", "market", "commodity", "date"])
+    combined = clean["n_rows"] > 1
+    clean.loc[combined, ["variety", "grade"]] = None
+    return clean, rejected
+
+
+def append_after(primary: pd.DataFrame, extra: pd.DataFrame) -> pd.DataFrame:
+    """Add rows from `extra` only for dates after the primary source's last date,
+    per commodity, so two sources never overlap or double-count."""
+    last = primary.groupby("commodity")["date"].max()
+    cutoff = extra["commodity"].map(last)
+    keep = extra[cutoff.isna() | (extra["date"] > cutoff)]
+    return pd.concat([primary, keep], ignore_index=True)
+
+
 def _num(series: pd.Series) -> pd.Series:
     return pd.to_numeric(series.astype(str).str.replace(",", "", regex=False), errors="coerce")
 
