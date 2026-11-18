@@ -17,6 +17,8 @@
   --div-high: #e34948;
   --focus: #1c5cab;
   --good-text: #006300;
+  --seq-low: #eef4fd;
+  --seq-high: #104281;
 }
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
@@ -38,6 +40,8 @@
     --div-high: #e66767;
     --focus: #86b6ef;
     --good-text: #0ca30c;
+    --seq-low: #1f2a36;
+    --seq-high: #9ec5f4;
   }
 }
 :root[data-theme="dark"] {
@@ -59,6 +63,8 @@
   --div-high: #e66767;
   --focus: #86b6ef;
   --good-text: #0ca30c;
+  --seq-low: #1f2a36;
+  --seq-high: #9ec5f4;
 }
 
 * { box-sizing: border-box; }

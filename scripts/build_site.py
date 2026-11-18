@@ -41,6 +41,13 @@ from farmiq_data.report import (  # noqa: E402
     seasonality_verdict,
     weather_verdict,
 )
+from farmiq_data.supply import (  # noqa: E402
+    monthly_supply,
+    parse_state_rows,
+    supply_calendar,
+    supply_surprise,
+    supply_verdict,
+)
 from farmiq_data.weather import (  # noqa: E402
     lagged_correlation,
     monthly_weather,
@@ -51,6 +58,44 @@ from farmiq_data.weather import (  # noqa: E402
 
 WEATHER_RAW = ROOT / "data/raw/weather"
 WEATHER_LAGS = [0, 1, 2, 3]
+SUPPLY_LAGS = [0, 1]
+
+
+def load_supply() -> dict[str, dict]:
+    """Per commodity: state names, monthly supply surprises and the supply calendar."""
+    states_file = ROOT / "data/raw/ceda/states.json"
+    if not states_file.exists():
+        return {}
+    names = {int(k): v for k, v in json.loads(states_file.read_text(encoding="utf-8")).items()}
+    out: dict[str, dict] = {}
+    for f in sorted((ROOT / "data/raw/ceda/quantities").glob("c*_s*_state_*.json")):
+        payload = json.loads(f.read_text(encoding="utf-8"))
+        req = payload["request"]
+        sid, crop = int(req["state_id"]), COMMODITIES[req["commodity_id"]]
+        daily = parse_state_rows(payload["rows"], "quantity", state_id=sid)
+        if daily.empty:
+            continue
+        m = monthly_supply(daily)
+        entry = out.setdefault(crop, {"monthly": [], "names": names})
+        entry["monthly"].append(m)
+    for entry in out.values():
+        monthly = pd.concat(entry["monthly"], ignore_index=True)
+        entry["surprise"] = supply_surprise(monthly)
+        entry["calendar"] = supply_calendar(monthly)
+        entry["years"] = monthly.groupby("state_id")["year"].agg(["min", "max"])
+    return out
+
+
+def supply_for(index_one_market: pd.DataFrame, supply: dict) -> dict:
+    """Correlate this market's price surprises with each state's supply surprises."""
+    surprise = price_surprise(index_one_market[["year", "month", "index"]])
+    corrs = []
+    for sid, g in supply["surprise"].groupby("state_id"):
+        for lag in SUPPLY_LAGS:
+            res = lagged_correlation(surprise, g, "supply_surprise", lag_months=lag, min_n=60)
+            corrs.append({"state": supply["names"].get(sid, str(sid)), "lag": lag,
+                          "r": _r(res[0]) if res else None, "n": res[1] if res else 0})
+    return {"corr": corrs, "verdict": supply_verdict(corrs)}
 
 RAW = ROOT / "data/raw/ceda"
 OUT = ROOT / "docs/data"
@@ -100,6 +145,8 @@ def _r(x, nd=3):
 def load_raw(indicator: str) -> list[tuple[int, int, list[dict]]]:
     out = []
     for f in sorted((RAW / indicator).glob("*.json")):
+        if "_state_" in f.name:  # state-level series are loaded by load_supply()
+            continue
         payload = json.loads(f.read_text(encoding="utf-8"))
         req = payload["request"]
         out.append((req["commodity_id"], req["district_id"][0], payload["rows"]))
@@ -207,7 +254,8 @@ def monthly_arrivals(a: pd.DataFrame) -> pd.DataFrame:
     return a.groupby(["market", "commodity", "year", "month"])["arrivals"].sum().reset_index()
 
 
-def build_commodity(name: str, prices: pd.DataFrame, arrivals: pd.DataFrame, weather: dict) -> dict:
+def build_commodity(name: str, prices: pd.DataFrame, arrivals: pd.DataFrame, weather: dict,
+                    supply: dict | None = None) -> dict:
     p = prices[prices["commodity"] == name]
     idx = seasonal_index(p)
     summ = month_summary(idx, min_years=5)
@@ -251,8 +299,19 @@ def build_commodity(name: str, prices: pd.DataFrame, arrivals: pd.DataFrame, wea
             "planner": planner_for(name, g) if mi["year"].nunique() >= PLANNER_MIN_FULL_YEARS else None,
             "weather": (weather_for(mi, weather[g["district"].iloc[0]])
                         if len(mi) and g["district"].iloc[0] in weather else None),
+            "supply": supply_for(mi, supply) if supply and len(mi) else None,
         }
-    return {"commodity": name, "markets": markets}
+    out = {"commodity": name, "markets": markets}
+    if supply:
+        cal = supply["calendar"]
+        out["supply_calendar"] = {
+            "states": [supply["names"].get(int(s), str(s)) for s in cal["state_id"].unique()],
+            "rows": [[supply["names"].get(int(s), str(s)), int(m), _r(sh), int(n)]
+                     for s, m, sh, n in cal[["state_id", "month", "share", "n_years"]].itertuples(index=False)],
+            "years": {supply["names"].get(int(s), str(s)): [int(r["min"]), int(r["max"])]
+                      for s, r in supply["years"].iterrows()},
+        }
+    return out
 
 
 def main() -> None:
@@ -260,6 +319,7 @@ def main() -> None:
     prices, rejected = load_prices()
     arrivals = load_arrivals()
     weather = load_weather()
+    supply = load_supply()
     logging.info("prices: %d clean, %d rejected | arrivals: %d rows", len(prices), len(rejected), len(arrivals))
 
     # Agmarknet downloads: cross-check CEDA where they overlap, and extend the
@@ -288,7 +348,7 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     available = []
     for name in COMMODITIES.values():
-        data = build_commodity(name, prices, arrivals, weather)
+        data = build_commodity(name, prices, arrivals, weather, supply.get(name))
         (OUT / f"{name.lower()}.json").write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
         logging.info("%s: %d markets", name, len(data["markets"]))
         if data["markets"]:

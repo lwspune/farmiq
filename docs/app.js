@@ -371,6 +371,91 @@
     extra.appendChild(el("p", { class: "note" }, `Weather at the ${m.district} district centre, ${wx.years[0]}–${wx.years[1]}.`));
   }
 
+  // ---------- supply from other states ----------
+  function supplyCard(m, p) {
+    const cal = state.data[state.commodity].supply_calendar;
+    const vbox = $("sup-verdict"); clear(vbox);
+    const ids = ["sup-legend", "chart-supcal", "chart-supcorr"];
+    if (!cal) {
+      vbox.textContent = "State-level supply data is not available yet.";
+      ids.forEach((id) => clear($(id))); table("table-sup", [], []);
+      return;
+    }
+    const crop = state.commodity === "onion" ? "onions" : "tomatoes";
+    const v = m.supply?.verdict;
+    const when = (lag) => (lag === 0 ? "the same month" : "the month after");
+    if (!v || v.verdict === "insufficient") {
+      vbox.textContent = "Not enough months at this market to compare with other states' supply.";
+    } else if (v.verdict === "link") {
+      const tested = (m.supply?.corr || []).filter((c) => c.r != null);
+      const neg = tested.filter((c) => c.r < 0).length;
+      const who = v.state === "All India" ? "mandis across India" : `mandis in ${v.state}`;
+      vbox.textContent = `Yes, partly: when ${who} received more ${crop} than usual, prices here tended to be lower ${when(v.lag)} (r = ${v.r}, ${v.n} months). ${neg} of ${tested.length} state-and-month checks point the same way (more supply, lower price), but with this many checks a single result near −0.3 can be chance.`;
+    } else {
+      vbox.textContent = `Only weakly. The strongest link is with ${v.state === "All India" ? "all-India arrivals" : v.state} (r = ${v.r}, ${v.n} months): more supply there, slightly lower prices here. Supply surprises from any single state explain little of this market's price surprises.`;
+    }
+
+    // Supply calendar heatmap (sequential: one hue, light -> dark)
+    const seq = d3.scaleSequential(d3.interpolateLab(css("--seq-low"), css("--seq-high"))).domain([0.03, 0.16]).clamp(true);
+    const legend = $("sup-legend"); clear(legend);
+    const bar = el("span", { class: "bar" });
+    bar.style.background = `linear-gradient(90deg, ${seq(0.03)}, ${seq(0.16)})`;
+    legend.append(el("span", {}, "3% of the year"), bar, el("span", {}, "16%+"));
+    const rows = cal.rows.map(([st, month, share, n]) => ({ st, month, share, n }));
+    const w = width("chart-supcal");
+    mount("chart-supcal", Plot.plot({
+      ...base(p, w), height: 40 + cal.states.length * 30, marginLeft: w < 520 ? 96 : 120,
+      x: { ...monthAxis, domain: d3.range(1, 13), type: "band", axis: "top" },
+      y: { label: null, domain: cal.states, type: "band" },
+      marks: [
+        Plot.cell(rows, { x: "month", y: "st", fill: (d) => seq(d.share), inset: 1, rx: 3,
+          channels: { State: "st", Month: (d) => MONTHS[d.month - 1], "Share of year": (d) => `${(d.share * 100).toFixed(1)}%`, Years: "n" },
+          tip: { format: { x: false, y: false, fill: false } } }),
+      ],
+    }));
+
+    // Correlations by state and lag
+    const corr = (m.supply?.corr || []).filter((c) => c.r != null).map((c) => ({ ...c, lagLabel: c.lag === 0 ? "same month" : "month after" }));
+    if (corr.length) {
+      const wc = width("chart-supcorr");
+      mount("chart-supcorr", Plot.plot({
+        ...base(p, wc), height: 260, marginLeft: 44, marginBottom: w < 520 ? 70 : 40,
+        x: { domain: cal.states, type: "band", label: null, tickRotate: wc < 520 ? -35 : 0 },
+        y: { domain: [-0.6, 0.6], label: "↑ Correlation", grid: true },
+        color: { domain: ["same month", "month after"], range: [p.s[0], p.s[1]], legend: true },
+        marks: [
+          Plot.ruleY([0], { stroke: p.axis, strokeWidth: 1.5 }),
+          Plot.ruleY([-0.3], { stroke: p.axis, strokeOpacity: 0.6 }),
+          ...[["same month", -7], ["month after", 7]].map(([lab, dx]) => Plot.dot(corr.filter((c) => c.lagLabel === lab), {
+            x: "state", y: "r", fill: "lagLabel", r: 6, stroke: p.surface, strokeWidth: 2, dx,
+            channels: { State: "state", When: "lagLabel", Months: "n" },
+            tip: { format: { x: false, y: (r) => r.toFixed(2), fill: false } } })),
+        ],
+      }));
+    } else { clear($("chart-supcorr")); }
+
+    table("table-sup", ["State", ...MONTHS, "Years"], cal.states.map((st) => {
+      const r = new Map(rows.filter((d) => d.st === st).map((d) => [d.month, d.share]));
+      const yrs = cal.years[st];
+      return [st, ...d3.range(1, 13).map((mo) => (r.has(mo) ? (r.get(mo) * 100).toFixed(1) + "%" : "–")), yrs ? `${yrs[0]}–${yrs[1]}` : "–"];
+    }));
+    const t = $("table-sup");
+    const extra = el("div");
+    const wrap = el("div", { class: "table-scroll" });
+    const tb = el("table"); const thead = el("thead"); const hr = el("tr");
+    ["State", "Same month (r)", "Month after (r)", "Months"].forEach((h) => hr.appendChild(el("th", { scope: "col" }, h)));
+    thead.appendChild(hr); tb.appendChild(thead);
+    const body = el("tbody");
+    cal.states.forEach((st) => {
+      const c0 = (m.supply?.corr || []).find((c) => c.state === st && c.lag === 0);
+      const c1 = (m.supply?.corr || []).find((c) => c.state === st && c.lag === 1);
+      const tr = el("tr");
+      [st, c0?.r == null ? "–" : c0.r.toFixed(2), c1?.r == null ? "–" : c1.r.toFixed(2), String(c0?.n ?? 0)].forEach((c) => tr.appendChild(el("td", {}, c)));
+      body.appendChild(tr);
+    });
+    tb.appendChild(body); wrap.appendChild(tb); extra.appendChild(wrap); t.appendChild(extra);
+  }
+
   // ---------- planner ----------
   const plan = { month: ((new Date().getMonth() + 1) % 12) + 1, first: null, length: null, years: "recent" };
 
@@ -596,7 +681,7 @@
       `${state.market} · ${m.district} district · ${fmt.int(m.n_days)} price days, ${m.first.slice(0, 4)}–${m.last.slice(0, 4)} · ${m.full_years} full years usable`;
     verdictCards(m);
     initPlanner(m); renderPlanner(m, p);
-    seasonChart(m, p); heatChart(m, p); historyChart(m, p); annualChart(m, p); arrivalsChart(m, p); weatherCard(m, p); volChart(m, p);
+    seasonChart(m, p); heatChart(m, p); historyChart(m, p); annualChart(m, p); arrivalsChart(m, p); weatherCard(m, p); supplyCard(m, p); volChart(m, p);
     renderCompare();
     document.querySelectorAll("#arr-h").forEach((h) => (h.textContent =
       `More ${state.commodity === "onion" ? "onions" : "tomatoes"} arriving, lower price?`));

@@ -106,6 +106,17 @@
       <details><summary>Show as table</summary><div id="table-wx"></div></details>
     </section>
 
+    <section class="card" aria-labelledby="sup-h">
+      <h2 id="sup-h">Does supply from other states explain price surprises?</h2>
+      <p class="muted">Arrivals at mandis in each state (and all India), from Agmarknet via CEDA. Darker = a bigger share of that state's yearly arrivals comes in that month.</p>
+      <p id="sup-verdict" class="pl-result" aria-live="polite"></p>
+      <div id="sup-legend" class="legend-ramp" aria-hidden="true"></div>
+      <div id="chart-supcal" class="chart"></div>
+      <p class="muted">Each dot: how strongly an unusually big or small month of arrivals in that state lined up with this market's price surprise (same month, or the month after). Below zero means more supply, lower price; beyond −0.3 is worth a look.</p>
+      <div id="chart-supcorr" class="chart"></div>
+      <details><summary>Show as table</summary><div id="table-sup"></div></details>
+    </section>
+
     <section class="card" aria-labelledby="vol-h">
       <h2 id="vol-h">When do prices swing most within a month?</h2>
       <p class="muted">Typical day-to-day spread of prices within each month (coefficient of variation; 0.3 = prices typically 30% away from the month's average).</p>
