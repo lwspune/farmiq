@@ -396,6 +396,11 @@
       const r = await fetch("data/meta.json");
       if (!r.ok) throw new Error(`Could not load metadata (${r.status})`);
       state.meta = await r.json();
+      // Crops still being collected stay listed but disabled, so nobody lands on an empty page.
+      const ready = new Set(state.meta.commodities || ["tomato"]);
+      for (const o of $("commodity").options) {
+        if (!ready.has(o.value)) { o.disabled = true; o.textContent += " (coming soon)"; }
+      }
       about();
       await selectCommodity("tomato");
     } catch (err) {

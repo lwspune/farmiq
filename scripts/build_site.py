@@ -174,16 +174,20 @@ def main() -> None:
         logging.info("CEDA vs Agmarknet: %s", comparison)
 
     OUT.mkdir(parents=True, exist_ok=True)
+    available = []
     for name in COMMODITIES.values():
         data = build_commodity(name, prices, arrivals)
         (OUT / f"{name.lower()}.json").write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
         logging.info("%s: %d markets", name, len(data["markets"]))
+        if data["markets"]:
+            available.append(name.lower())
 
     reasons = rejected["reason"].value_counts().to_dict() if len(rejected) else {}
     meta = {
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "date_range": [prices["date"].min().date().isoformat(), prices["date"].max().date().isoformat()],
         "districts": sorted(prices["district"].dropna().unique().tolist()),
+        "commodities": available,
         "n_price_days": int(len(prices)),
         "rejected": {k: int(v) for k, v in reasons.items()},
         "source_check": comparison,
