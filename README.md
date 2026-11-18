@@ -11,6 +11,8 @@ questions:
 - **Risk:** in which months do prices swing most?
 - **Markets:** do nearby markets share the same seasonal shape?
 - **Weather:** do unusually wet or hot months line up with price surprises later?
+- **Other states:** when does each state send produce to market, and do unusually
+  big or small arrivals elsewhere line up with local price surprises?
 
 It also has a **planting-window planner**: pick a transplant month and crop
 timing, and see the low / typical / high mandi price in the harvest months that
@@ -73,6 +75,11 @@ Code in `farmiq_data/`:
 - `planner.py`: harvest months for a transplant month and crop timing (a month
   counts when 10+ harvest days fall in it), harvest-window prices per year,
   low/typical/high over the last 10 years or all years, break-even price.
+- `supply.py`: state-level arrivals (Andhra Pradesh, Karnataka, Madhya Pradesh,
+  Gujarat, Telangana, Rajasthan, Maharashtra and all India): monthly supply
+  calendar, supply surprises, and the strongest supply-to-price link per market.
+  CEDA's arrivals endpoint only answers wide date ranges; short windows return
+  "No data exists", so always request the full range.
 - `weather.py`: Open-Meteo client, monthly rainfall and heat anomalies, and
   their lagged correlation with "price surprises" (a month's price versus the
   usual level for that month).
@@ -83,7 +90,12 @@ Findings so far:
   boom-and-bust tendency between years, and only a weak link to local weather.
 - Onion: October-November dear, March-July cheap, and a stronger boom-and-bust
   cycle between years.
-- Prices are mostly set by supply from across India, not local weather.
+- Prices are mostly set by supply from across India, not local weather. More
+  arrivals elsewhere line up with lower local prices in most checks, but any one
+  state explains only part of it (strongest r about -0.4 to -0.47, e.g. onion at
+  Shrirampur and tomato at Rahuri against all-India arrivals).
+- Supply calendar: Karnataka sends most tomatoes in June-August, Maharashtra in
+  September-October, Madhya Pradesh in October-December.
 
 ### Rules behind the verdicts
 
@@ -106,6 +118,7 @@ echo CEDA_API_KEY=your-key > .env                     # free key from api.ceda.a
 .venv/Scripts/python -m pytest                        # tests
 .venv/Scripts/python scripts/fetch_ceda.py            # slow on purpose (API rate limit)
 .venv/Scripts/python scripts/fetch_weather.py
+.venv/Scripts/python scripts/fetch_states.py           # state-level arrivals and prices
 .venv/Scripts/python scripts/build_site.py
 .venv/Scripts/python -m http.server 8765 --directory docs   # open http://127.0.0.1:8765
 ```

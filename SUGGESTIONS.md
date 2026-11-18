@@ -13,6 +13,7 @@ the owner's OK before shipped work is changed.
 
 - Done 2026-11-18: Agmarknet prices 31 Oct 2025 - 18 Nov 2026 for tomato and onion (4 CAPTCHAs). Repeat monthly-ish to keep current.
 - Agmarknet "Both" (price + arrivals) report exists from 7 Nov 2025; could add arrivals for the post-CEDA period.
-- Other states' supply (Karnataka, Andhra Pradesh, Madhya Pradesh markets) via CEDA, within its daily quota.
+- Done 2026-11-18: other states' supply (state-level arrivals for 7 states + all India) on the site.
+- State-level prices are downloaded but not yet used: compare price levels across states (where is it cheapest to buy, dearest to sell).
 - Site data is about 3 MB (onion 2 MB, mostly planner grids); GitHub Pages gzips it, but split per market if phones load slowly.
 - Automatic monthly rebuild: revisit once data is complete (raw history is not in the repo by design).
