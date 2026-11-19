@@ -54,6 +54,27 @@ def seasonal_index(
     return m.reset_index(drop=True)
 
 
+def ltm_index(df: pd.DataFrame, min_days_per_month: int = 5, min_prior_months: int = 9) -> pd.DataFrame:
+    """Each month's median price divided by the average of the 12 months before it
+    (last twelve months, LTM): how dear the month was against what the market had
+    just been paying. Uses only past prices. A month is left out unless at least
+    `min_prior_months` of those 12 months have a price.
+    """
+    m = monthly_medians(df, min_days_per_month)
+    parts = []
+    for _, g in m.groupby(GROUP):
+        k = g["year"] * 12 + g["month"] - 1
+        s = pd.Series(g["monthly_median"].to_numpy(), index=k.to_numpy())
+        full = s.reindex(range(int(k.min()), int(k.max()) + 1))
+        prior = full.shift(1).rolling(12, min_periods=min_prior_months).mean()
+        out = g.copy()
+        out["index"] = (s / prior.reindex(s.index)).to_numpy()
+        parts.append(out.dropna(subset=["index"]))
+    if not parts:
+        return m.assign(index=pd.Series(dtype=float)).iloc[0:0].reset_index(drop=True)
+    return pd.concat(parts, ignore_index=True)
+
+
 def percentiles(values, min_n: int = 5) -> dict | None:
     """P10-P90 of `values`, or None when there are fewer than `min_n` values."""
     arr = np.asarray(pd.Series(values).dropna(), dtype=float)

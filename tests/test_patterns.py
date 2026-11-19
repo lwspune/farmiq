@@ -122,3 +122,50 @@ def test_monthly_range_keeps_markets_apart_and_thin_months():
     assert r.loc["Pune", "p10"] == pytest.approx(11.0)
     assert r.loc["Pune", "p90"] == pytest.approx(19.0)
     assert r.loc["Nashik", "p10"] == r.loc["Nashik", "p90"] == pytest.approx(30.0)
+
+
+def _monthly_days(prices_by_month, market="Pune", days=6):
+    """prices_by_month: {(year, month): price}; `days` identical reporting days per month."""
+    rows = []
+    for (y, m), v in prices_by_month.items():
+        for d in range(1, days + 1):
+            rows.append({"date": pd.Timestamp(y, m, d), "market": market, "commodity": "Onion", "modal_inr_kg": v})
+    return pd.DataFrame(rows)
+
+
+def test_ltm_index_divides_by_the_twelve_months_before():
+    from farmiq_data.patterns import ltm_index
+    # Pune onion 2021 monthly medians, then January 2022 (worked example shown to the owner).
+    p2021 = [21.5, 27.5, 11.5, 8.5, 9.5, 13.75, 13.5, 12.5, 12.0, 20.0, 17.75, 19.0]
+    prices = {(2021, m + 1): v for m, v in enumerate(p2021)} | {(2022, 1): 17.5}
+    idx = ltm_index(_monthly_days(prices)).set_index(["year", "month"])
+    assert idx.loc[(2022, 1), "index"] == pytest.approx(17.5 / (187.0 / 12))   # 1.12
+    assert idx.loc[(2022, 1), "monthly_median"] == pytest.approx(17.5)
+    assert (2021, 1) not in idx.index         # no history before it
+
+
+def test_ltm_index_needs_nine_of_the_twelve_months_before():
+    from farmiq_data.patterns import ltm_index
+    base = {(2020, m): 10.0 for m in range(1, 13)}
+    # Drop four of 2020's months: 2021-02's window (Feb 2020 - Jan 2021) then has 8 of 12, too few.
+    prices = dict(base) | {(2021, 1): 20.0, (2021, 2): 20.0}
+    for m in (3, 4, 5, 6):
+        prices.pop((2020, m))
+    idx = ltm_index(_monthly_days(prices)).set_index(["year", "month"])
+    assert (2021, 2) not in idx.index           # window Feb 2020-Jan 2021 has 8 months
+    assert (2020, 12) not in idx.index          # window Dec 2019-Nov 2020 has 7 months
+    prices[(2020, 3)] = 10.0                    # now 9 of 12 for 2021-02
+    idx = ltm_index(_monthly_days(prices)).set_index(["year", "month"])
+    assert idx.loc[(2021, 2), "index"] == pytest.approx(20.0 / ((10.0 * 8 + 20.0) / 9))
+
+
+def test_ltm_index_ignores_thin_months_and_keeps_markets_apart():
+    from farmiq_data.patterns import ltm_index
+    a = _monthly_days({(2020, m): 10.0 for m in range(1, 13)} | {(2021, 1): 30.0}, market="Pune")
+    b = _monthly_days({(2020, m): 5.0 for m in range(1, 13)} | {(2021, 1): 5.0}, market="Nashik")
+    thin = _monthly_days({(2021, 1): 99.0}, market="Pune", days=2)   # 2 extra days can't outvote 6
+    idx = ltm_index(pd.concat([a, b, thin]), min_days_per_month=5).set_index(["market", "year", "month"])
+    assert idx.loc[("Pune", 2021, 1), "index"] == pytest.approx(3.0)
+    assert idx.loc[("Nashik", 2021, 1), "index"] == pytest.approx(1.0)
+    only_thin = ltm_index(_monthly_days({(2020, m): 10.0 for m in range(1, 13)} | {(2021, 1): 30.0}, days=3))
+    assert only_thin.empty                     # every month has 3 days < 5
