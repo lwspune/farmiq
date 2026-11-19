@@ -168,7 +168,9 @@
   }
 
   function heatChart(m, p) {
-    const data = m.index.map(([year, month, idx]) => ({ year, month, idx }));
+    // P10-P90 of daily modal prices per month: the range most days fell in (₹/kg).
+    const range = new Map(m.monthly.map(([y, mo, , , lo, hi]) => [y * 12 + mo, { lo, hi }]));
+    const data = m.index.map(([year, month, idx]) => ({ year, month, idx, ...(range.get(year * 12 + month) || {}) }));
     // Show every year in the range so missing years appear as blank rows, not silently skipped.
     const ys = data.map((d) => d.year);
     const years = ys.length ? d3.range(d3.min(ys), d3.max(ys) + 1) : [];
@@ -177,23 +179,50 @@
     const bar = el("span", { class: "bar" });
     bar.style.background = `linear-gradient(90deg, ${p.low}, ${p.mid}, ${p.high})`;
     legend.append(el("span", {}, "0.4× cheaper"), bar, el("span", {}, "2.5× dearer"));
+    // One decimal only when the whole range is under ₹10, so both ends read alike ("7.0–9.8", "6–16").
+    const rangeText = (d) => {
+      if (d.lo == null) return "";
+      const dp = d.hi < 10 ? 1 : 0;
+      return `${d.lo.toFixed(dp)}–${d.hi.toFixed(dp)}`;
+    };
     const w = width("chart-heat");
+    const marginLeft = 44;
+    // Print the range in the cell only when a month column is wide enough (desktop); phones get it on tap.
+    const inCell = (w - marginLeft - 20) / 12 >= 52;
+    const rowH = inCell ? 22 : 18;
+    // Black or white text, whichever contrasts more with the cell (always >= 4.5:1, WCAG AA).
+    const luminance = (c) => {
+      const { r, g, b } = d3.rgb(c);
+      const lin = (v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+      return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+    };
+    const textFill = (d) => (luminance(color(d.idx)) < 0.179 ? "#ffffff" : "#000000");
     mount("chart-heat", Plot.plot({
-      ...base(p, w), height: 40 + years.length * 18, marginLeft: 44,
+      ...base(p, w), height: 40 + years.length * rowH, marginLeft,
       x: { ...monthAxis, domain: d3.range(1, 13), type: "band", axis: "top" },
       y: { label: null, domain: years, type: "band", tickFormat: (y) => String(y) },
       marks: [
         Plot.cell(data, {
           x: "month", y: "year", fill: (d) => color(d.idx), inset: 1, rx: 3,
-          channels: { Year: (d) => String(d.year), Month: (d) => MONTHS[d.month - 1], "× year's average": (d) => d.idx.toFixed(2) },
+          channels: {
+            Year: (d) => String(d.year), Month: (d) => MONTHS[d.month - 1], "× year's average": (d) => d.idx.toFixed(2),
+            "Price range (₹/kg)": (d) => rangeText(d) || "–",
+          },
           tip: { format: { x: false, y: false, fill: false } },
         }),
+        ...(inCell ? [Plot.text(data, {
+          x: "month", y: "year", text: rangeText, fill: textFill, fontSize: 10.5,
+          fontVariant: "tabular-nums", pointerEvents: "none",
+        })] : []),
       ],
     }));
     const byYear = d3.group(data, (d) => d.year);
     table("table-heat", ["Year", ...MONTHS], years.map((y) => {
-      const row = new Map((byYear.get(y) || []).map((d) => [d.month, d.idx]));
-      return [String(y), ...d3.range(1, 13).map((mo) => fmt.x(row.get(mo)))];
+      const row = new Map((byYear.get(y) || []).map((d) => [d.month, d]));
+      return [String(y), ...d3.range(1, 13).map((mo) => {
+        const d = row.get(mo);
+        return d ? `${fmt.x(d.idx)} (₹${rangeText(d) || "–"})` : "–";
+      })];
     }));
   }
 
