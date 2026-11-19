@@ -185,7 +185,7 @@
       marks: [
         Plot.cell(data, {
           x: "month", y: "year", fill: (d) => color(d.idx), inset: 1, rx: 3,
-          channels: { Year: "year", Month: (d) => MONTHS[d.month - 1], "× year's average": (d) => d.idx.toFixed(2) },
+          channels: { Year: (d) => String(d.year), Month: (d) => MONTHS[d.month - 1], "× year's average": (d) => d.idx.toFixed(2) },
           tip: { format: { x: false, y: false, fill: false } },
         }),
       ],
@@ -415,7 +415,7 @@
       marks: [
         Plot.barY(rain, { x: "year", y: "pct", rx: 2, insetLeft: 1, insetRight: 1,
           fill: (d) => (d.year === c.year ? p.s[0] : p.muted), fillOpacity: (d) => (d.year === c.year ? 1 : d.isDry ? 0.75 : 0.35),
-          channels: { Year: "year", Rain: (d) => `${d.pct}% of normal` }, tip: { format: { x: false, y: false, fillOpacity: false } } }),
+          channels: { Year: (d) => String(d.year), Rain: (d) => `${d.pct}% of normal` }, tip: { format: { x: false, y: false, fillOpacity: false } } }),
         Plot.ruleY([100], { stroke: p.axis }),
         Plot.ruleY([dry.threshold], { stroke: p.ink2, strokeOpacity: 0.6 }),
         Plot.text([dry.threshold], { frameAnchor: "left", y: (d) => d, dy: -7, dx: 4, text: () => `dry below ${dry.threshold}%`,
