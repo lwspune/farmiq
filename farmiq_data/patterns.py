@@ -27,6 +27,17 @@ def monthly_medians(df: pd.DataFrame, min_days_per_month: int = 5) -> pd.DataFra
     return m[m["n_days"] >= min_days_per_month]
 
 
+def monthly_range(df: pd.DataFrame) -> pd.DataFrame:
+    """Per market, commodity and month: median, reporting days, and the P10-P90 range
+    of daily modal prices (where most days fell, ignoring one-off extreme days)."""
+    d = df.assign(year=df["date"].dt.year, month=df["date"].dt.month)
+    g = d.groupby([*GROUP, "year", "month"])["modal_inr_kg"]
+    return g.agg(
+        monthly_median="median", n_days="count",
+        p10=lambda s: s.quantile(0.1), p90=lambda s: s.quantile(0.9),
+    ).reset_index()
+
+
 def seasonal_index(
     df: pd.DataFrame, min_days_per_month: int = 5, min_months_per_year: int = 9
 ) -> pd.DataFrame:

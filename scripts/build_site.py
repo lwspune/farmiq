@@ -29,6 +29,7 @@ from farmiq_data.patterns import (  # noqa: E402
     annual_change_autocorrelation,
     month_summary,
     monthly_medians,
+    monthly_range,
     seasonal_index,
     volatility_by_month,
 )
@@ -301,8 +302,7 @@ def build_commodity(name: str, prices: pd.DataFrame, arrivals: pd.DataFrame, wea
     summ = month_summary(idx, min_years=5)
     vol = volatility_by_month(p)
     arr_m = monthly_arrivals(arrivals[arrivals["commodity"] == name])
-    d = p.assign(year=p["date"].dt.year, month=p["date"].dt.month)
-    monthly = d.groupby(["market", "year", "month"])["modal_inr_kg"].agg(["median", "count"]).reset_index()
+    monthly = monthly_range(p)
 
     markets = {}
     for market, g in p.groupby("market"):
@@ -319,8 +319,10 @@ def build_commodity(name: str, prices: pd.DataFrame, arrivals: pd.DataFrame, wea
             "first": g["date"].min().date().isoformat(),
             "last": g["date"].max().date().isoformat(),
             "full_years": int(mi["year"].nunique()),
-            "monthly": [[int(y), int(m), _r(v, 2), int(n)]
-                        for y, m, v, n in mm[["year", "month", "median", "count"]].itertuples(index=False)],
+            # [year, month, median, reporting days, P10, P90] of daily modal prices (₹/kg)
+            "monthly": [[int(y), int(m), _r(v, 2), int(n), _r(lo, 2), _r(hi, 2)]
+                        for y, m, v, n, lo, hi in mm[["year", "month", "monthly_median", "n_days", "p10", "p90"]]
+                        .itertuples(index=False)],
             "index": [[int(y), int(m), _r(v)] for y, m, v in mi[["year", "month", "index"]].itertuples(index=False)],
             "season": [
                 {"month": int(r.month), "n_years": int(r.n_years), "years_above": int(r.years_above_avg),

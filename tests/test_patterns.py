@@ -97,3 +97,28 @@ def test_volatility_is_zero_for_flat_prices_and_positive_for_swings():
     assert vol.loc[("Pune", 1), "median_cv"] == pytest.approx(0.0)
     assert vol.loc[("Nashik", 1), "median_cv"] > 0.2
     assert not math.isnan(vol.loc[("Nashik", 1), "median_cv"])
+
+
+def test_monthly_range_gives_p10_and_p90_of_daily_modal_prices():
+    from farmiq_data.patterns import monthly_range
+    days = pd.date_range("2024-03-01", periods=11)
+    df = pd.DataFrame({"date": days, "market": "Pune", "commodity": "Tomato",
+                       "modal_inr_kg": [10.0, 11, 12, 13, 14, 15, 16, 17, 18, 19, 100.0]})
+    r = monthly_range(df)
+    assert len(r) == 1
+    row = r.iloc[0]
+    assert (row["year"], row["month"], row["n_days"]) == (2024, 3, 11)
+    assert row["monthly_median"] == pytest.approx(15.0)
+    assert row["p10"] == pytest.approx(11.0)
+    assert row["p90"] == pytest.approx(19.0)   # the one 100 ₹/kg day does not stretch the range
+
+
+def test_monthly_range_keeps_markets_apart_and_thin_months():
+    from farmiq_data.patterns import monthly_range
+    df = pd.DataFrame({"date": pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-02"]),
+                       "market": ["Pune", "Pune", "Nashik"], "commodity": "Onion",
+                       "modal_inr_kg": [10.0, 20.0, 30.0]})
+    r = monthly_range(df).set_index("market")
+    assert r.loc["Pune", "p10"] == pytest.approx(11.0)
+    assert r.loc["Pune", "p90"] == pytest.approx(19.0)
+    assert r.loc["Nashik", "p10"] == r.loc["Nashik", "p90"] == pytest.approx(30.0)
