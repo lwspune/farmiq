@@ -70,8 +70,10 @@ Code in `farmiq_data/`:
   several lots or varieties for the same day (CEDA has no variety field), they
   are combined: median of the modal prices, lowest min, highest max, and the
   number of rows combined is kept.
-- `patterns.py`: seasonal index (each month / that year's average), month
-  summaries, year-to-year autocorrelation, within-month volatility.
+- `patterns.py`: last-twelve-months index (each month / average of the 12
+  months before it; used by the season, heatmap and compare charts), calendar-year
+  index (each month / that year's average; used by the weather, supply and
+  arrivals checks), month summaries, year-to-year autocorrelation, within-month volatility.
 - `report.py`: verdict rules and the cross-source check.
 - `ceda.py`: API client (key from `CEDA_API_KEY` or a local `.env`, never logged).
 - `planner.py`: harvest months for a transplant month and crop timing (a month
@@ -88,10 +90,16 @@ Code in `farmiq_data/`:
 
 Findings so far:
 
-- Tomato: a strong seasonal pattern (June-July dear, January-April cheap), a
-  boom-and-bust tendency between years, and only a weak link to local weather.
-- Onion: October-November dear, March-July cheap, and a stronger boom-and-bust
-  cycle between years.
+- Tomato: February-April reliably cheaper than the previous 12 months at most
+  markets; July reliably dear at 8 of 19 markets with enough data. A boom-and-bust
+  tendency between years, and only a weak link to local weather.
+- Onion: March-May reliably cheap at most markets; October reliably dear at 23
+  of 41. A stronger boom-and-bust cycle between years, which is why the dear
+  months are less reliable: the year after a boom, even October-November can
+  stay below the boom year's prices.
+- Against each month's own calendar year (the earlier method) the dear months
+  looked more reliable (tomato 18 markets clear, onion 40), but that comparison
+  uses months still to come and splits onion's Oct-Jan season at the year end.
 - Prices are mostly set by supply from across India, not local weather. More
   arrivals elsewhere line up with lower local prices in most checks, but any one
   state explains only part of it (strongest r about -0.4 to -0.47, e.g. onion at
@@ -107,8 +115,11 @@ Findings so far:
 ### Rules behind the verdicts
 
 - A month counts only with at least 5 reporting days; a year only with at least 9 such months.
-- A seasonal verdict needs 8+ full years. A month is *reliably* dear (cheap) if
-  it was above (below) that year's average in at least 75% of years.
+- Seasonal charts compare each month with the average of the 12 months before it
+  (needs prices in 9 of those 12 months), so they use only past prices, the way a
+  trader sees it. Inflation leaves a slight upward lean (about 3%).
+- A seasonal verdict needs 8+ years. A month is *reliably* dear (cheap) if it was
+  above (below) the previous 12 months in at least 75% of years.
 - Boom and bust: correlation between one year's price change and the next;
   r <= -0.3 over at least 6 pairs of consecutive years.
 - Supply: correlation between a month's arrivals and its price, each relative to

@@ -17,3 +17,5 @@ the owner's OK before shipped work is changed.
 - State-level prices are downloaded but not yet used: compare price levels across states (where is it cheapest to buy, dearest to sell).
 - Site data is about 3 MB (onion 2 MB, mostly planner grids); GitHub Pages gzips it, but split per market if phones load slowly.
 - Automatic monthly rebuild: revisit once data is complete (raw history is not in the repo by design).
+- Owner request 2026-11-19, parked ("ignore for now"): a price table under a chart, years as columns, months as rows, median ₹/kg per cell for the chosen market. Data is already in `monthly`; open question is which card it sits under.
+- Done 2026-11-19: season, heatmap, compare and verdicts switched to the last-twelve-months baseline (owner's choice). Weather, supply and arrivals checks stay on the calendar-year index on purpose (LTM carries last year's boom or bust into every month and blurs those correlations).
