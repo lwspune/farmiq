@@ -104,15 +104,15 @@
 
     if (sv.verdict === "clear") {
       cards.push(["Seasonal pattern?", "Yes, a reliable one",
-        `Dearer than the year's average in ${fmt.months(sv.high_months)}, cheaper in ${fmt.months(sv.low_months)}, in at least ${Math.round(rules.reliable_share * 100)}% of ${sv.n_years} years.`]);
+        `Dearer than the previous 12 months in ${fmt.months(sv.high_months)}, cheaper in ${fmt.months(sv.low_months)}, in at least ${Math.round(rules.reliable_share * 100)}% of ${sv.n_years} years.`]);
     } else if (sv.verdict === "weak") {
       const hi = sv.high_months.length ? ` ${fmt.months(sv.high_months)} reliably dear.` : "";
       const lo = sv.low_months.length ? ` ${fmt.months(sv.low_months)} reliably cheap.` : "";
       cards.push(["Seasonal pattern?", "Only a weak one",
-        `Over ${sv.n_years} years, months were not reliably high and low together.${hi}${lo}`]);
+        `Over ${sv.n_years} years, months were not reliably high and low together against the previous 12 months; in the year after a boom, even the usual dear months can stay below it.${hi}${lo}`]);
     } else {
       cards.push(["Seasonal pattern?", "Not enough data",
-        `Only ${sv.n_years} full years here; ${rules.min_years_for_verdict} needed for a verdict.`]);
+        `Only ${sv.n_years} years here; ${rules.min_years_for_verdict} needed for a verdict.`]);
     }
 
     const bbText = {
@@ -151,19 +151,19 @@
     mount("chart-season", Plot.plot({
       ...base(p, w), height: 300, marginLeft: 44,
       x: { ...monthAxis, domain: d3.range(1, 13), type: "band" },
-      y: { label: "× year's average", grid: true, domain: [0, Math.max(2, d3.max(data, (d) => d.p90 ?? d.median) * 1.05)] },
+      y: { label: "× previous 12 months", grid: true, domain: [0, Math.max(2, d3.max(data, (d) => d.p90 ?? d.median) * 1.05)] },
       marks: [
         Plot.ruleY([1], { stroke: p.axis, strokeWidth: 1.5 }),
         Plot.ruleX(data.filter((d) => d.p10 != null), { x: "month", y1: "p10", y2: "p90", stroke: p.s[0], strokeWidth: 6, strokeOpacity: 0.3, strokeLinecap: "round" }),
         Plot.dot(data, {
           x: "month", y: "median", r: 6, fill: p.s[0], stroke: p.surface, strokeWidth: 2,
-          channels: { Month: "label", "Years above average": (d) => `${d.years_above} of ${d.n_years}` },
+          channels: { Month: "label", "Years above previous 12 months": (d) => `${d.years_above} of ${d.n_years}` },
           tip: { format: { x: false, y: (v) => v.toFixed(2) + "×" } },
         }),
         Plot.text(data, { x: "month", y: () => 0, dy: -8, text: (d) => `${d.years_above}/${d.n_years}`, fill: p.muted, fontSize: 10 }),
       ],
     }));
-    table("table-season", ["Month", "Typical (× avg)", "Low (P10)", "High (P90)", "Years above avg"],
+    table("table-season", ["Month", "Typical (× previous 12 months)", "Low (P10)", "High (P90)", "Years above"],
       data.map((d) => [d.label, fmt.x(d.median), fmt.x(d.p10), fmt.x(d.p90), `${d.years_above} of ${d.n_years}`]));
   }
 
@@ -205,7 +205,7 @@
         Plot.cell(data, {
           x: "month", y: "year", fill: (d) => color(d.idx), inset: 1, rx: 3,
           channels: {
-            Year: (d) => String(d.year), Month: (d) => MONTHS[d.month - 1], "× year's average": (d) => d.idx.toFixed(2),
+            Year: (d) => String(d.year), Month: (d) => MONTHS[d.month - 1], "× previous 12 months": (d) => d.idx.toFixed(2),
             "Price range (₹/kg)": (d) => rangeText(d) || "–",
           },
           tip: { format: { x: false, y: false, fill: false } },
@@ -733,7 +733,7 @@
     mount("chart-compare", Plot.plot({
       ...base(p, w), height: 300, marginLeft: 44, marginRight: 16,
       x: { ...monthAxis, domain: d3.range(1, 13) },
-      y: { label: "× year's average", grid: true },
+      y: { label: "× previous 12 months", grid: true },
       color: { domain: names, range: names.map((n) => p.s[state.compare.get(n)]), legend: true },
       marks: [
         Plot.ruleY([1], { stroke: p.axis }),
@@ -765,8 +765,8 @@
       ...(src.agmarknet ? [`Sources by date: CEDA (a copy of Agmarknet) ${src.ceda[0]} to ${src.ceda[1]}; Agmarknet 2.0 downloads ${src.agmarknet[0]} to ${src.agmarknet[1]}, added only after CEDA's last date so nothing is counted twice. Arrivals are from CEDA only.`] : []),
       ...(m.combined_market_days ? [`${fmt.int(m.combined_market_days)} market-days had several lots or varieties reported (the source does not say which); for those days the median of their modal prices is used, not one picked at random.`] : []),
       `Records removed (counted, not hidden): ${Object.entries(m.rejected).map(([k, v]) => `${fmt.int(v)} ${REASONS[k] || k.replaceAll("_", " ")}`).join("; ") || "none"}.`,
-      `A month counts only with at least ${m.rules.min_days_per_month} reporting days, and a year only with at least ${m.rules.min_months_per_year} such months. A verdict needs ${m.rules.min_years_for_verdict}+ years; a month is "reliably" dear or cheap if it was so in ${Math.round(m.rules.reliable_share * 100)}% of years.`,
-      "Prices are nominal (not adjusted for inflation); the month-vs-year comparisons remove inflation within each year.",
+      `A month counts only with at least ${m.rules.min_days_per_month} reporting days. The season, heatmap and compare charts divide each month's price by the average of the 12 months before it, and need prices in at least ${m.rules.min_prior_months} of those 12 months. A verdict needs ${m.rules.min_years_for_verdict}+ years; a month is "reliably" dear or cheap if it was so in ${Math.round(m.rules.reliable_share * 100)}% of years.`,
+      "Prices are nominal (not adjusted for inflation). Comparing with the previous 12 months removes most of it; a slight upward lean of about 3% remains. The weather, supply and arrivals checks compare each month with its own calendar year (a year needs prices in " + m.rules.min_months_per_year + " months).",
       "Modal price is the most common wholesale price at the mandi that day. A farmer's own realisation is lower after transport, commission, grading and rejection.",
     ];
     if (m.source_check && m.source_check.n_matched) {

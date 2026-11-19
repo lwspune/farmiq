@@ -60,14 +60,14 @@
 
     <section class="card" aria-labelledby="season-h">
       <h2 id="season-h">Which months are expensive?</h2>
-      <p class="muted">Each month's price compared with the same year's average (1.0 = an average month). Dividing by each year's own level removes inflation and boom or bust years, leaving only the shape. Dot = typical year; bar = range in 8 of 10 years.</p>
+      <p class="muted">Each month's price compared with the average of the 12 months before it: how dear it was against what the market had just been paying (1.0 = the same; 1.5 = half again dearer). Uses only past prices. Dot = typical year; bar = range in 8 of 10 years.</p>
       <div id="chart-season" class="chart"></div>
       <details><summary>Show as table</summary><div id="table-season"></div></details>
     </section>
 
     <section class="card" aria-labelledby="heat-h">
       <h2 id="heat-h">Every year, month by month</h2>
-      <p class="muted">Red = dearer than that year's average, blue = cheaper. If the same columns are red year after year, the pattern is real. Blank = too few reporting days that month or year. Numbers = that month's price range in ₹ per kg (10th to 90th percentile of daily prices, so one-off extreme days are left out; not adjusted for inflation). On a phone, tap a cell.</p>
+      <p class="muted">Red = dearer than the previous 12 months, blue = cheaper. If the same columns are red year after year, the pattern is real. Blank = too few reporting days that month or year. Numbers = that month's price range in ₹ per kg (10th to 90th percentile of daily prices, so one-off extreme days are left out; not adjusted for inflation). On a phone, tap a cell.</p>
       <div id="heat-legend" class="legend-ramp" aria-hidden="true"></div>
       <div id="chart-heat" class="chart"></div>
       <details><summary>Show as table</summary><div id="table-heat"></div></details>
@@ -138,7 +138,7 @@
 
     <section class="card" aria-labelledby="cmp-h">
       <h2 id="cmp-h">Compare markets</h2>
-      <p class="muted">The seasonal shape (typical year) for up to four markets. Pick markets to compare:</p>
+      <p class="muted">The seasonal shape (typical year, each month against the previous 12 months) for up to four markets. Pick markets to compare:</p>
       <div id="compare-picker" class="picker" role="group" aria-label="Markets to compare"></div>
       <div id="chart-compare" class="chart"></div>
       <details><summary>Show as table</summary><div id="table-compare"></div></details>

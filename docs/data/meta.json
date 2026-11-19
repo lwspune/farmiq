@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-19T01:50:06+00:00",
+ "generated_at": "2026-11-19T02:35:55+00:00",
  "date_range": [
   "2003-01-01",
   "2026-11-18"
@@ -52,6 +52,7 @@
   "reliable_share": 0.75,
   "min_days_per_month": 5,
   "min_months_per_year": 9,
+  "min_prior_months": 9,
   "boom_bust_r": 0.3
  },
  "credit": "Price and arrival data: Agmarknet (Directorate of Marketing & Inspection, GoI), via the CEDA Agri Market API, Centre for Economic Data and Analysis, Ashoka University. Weather: Open-Meteo historical weather API (ERA5 reanalysis), CC BY 4.0."

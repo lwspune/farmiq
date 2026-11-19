@@ -27,6 +27,7 @@ from farmiq_data.normalise import (  # noqa: E402
 )
 from farmiq_data.patterns import (  # noqa: E402
     annual_change_autocorrelation,
+    ltm_index,
     month_summary,
     monthly_medians,
     monthly_range,
@@ -298,8 +299,11 @@ def monthly_arrivals(a: pd.DataFrame) -> pd.DataFrame:
 def build_commodity(name: str, prices: pd.DataFrame, arrivals: pd.DataFrame, weather: dict,
                     supply: dict | None = None) -> dict:
     p = prices[prices["commodity"] == name]
+    # Calendar-year index: full years, weather and supply surprises, arrivals and planner checks.
     idx = seasonal_index(p)
-    summ = month_summary(idx, min_years=5)
+    # Last-twelve-months index: the season, heatmap and compare charts and the seasonal verdict.
+    ltm = ltm_index(p)
+    summ = month_summary(ltm, min_years=5)
     vol = volatility_by_month(p)
     arr_m = monthly_arrivals(arrivals[arrivals["commodity"] == name])
     monthly = monthly_range(p)
@@ -307,6 +311,7 @@ def build_commodity(name: str, prices: pd.DataFrame, arrivals: pd.DataFrame, wea
     markets = {}
     for market, g in p.groupby("market"):
         mi = idx[idx["market"] == market]
+        ml = ltm[ltm["market"] == market]
         ms = summ[summ["market"] == market].sort_values("month")
         annual = mi.groupby("year")["monthly_median"].mean()
         am = arr_m[arr_m["market"] == market]
@@ -323,7 +328,8 @@ def build_commodity(name: str, prices: pd.DataFrame, arrivals: pd.DataFrame, wea
             "monthly": [[int(y), int(m), _r(v, 2), int(n), _r(lo, 2), _r(hi, 2)]
                         for y, m, v, n, lo, hi in mm[["year", "month", "monthly_median", "n_days", "p10", "p90"]]
                         .itertuples(index=False)],
-            "index": [[int(y), int(m), _r(v)] for y, m, v in mi[["year", "month", "index"]].itertuples(index=False)],
+            # Month's price / average of the 12 months before it
+            "index": [[int(y), int(m), _r(v)] for y, m, v in ml[["year", "month", "index"]].itertuples(index=False)],
             "season": [
                 {"month": int(r.month), "n_years": int(r.n_years), "years_above": int(r.years_above_avg),
                  "median": _r(r.median_index), "p10": _r(r.p10), "p90": _r(r.p90)}
@@ -410,7 +416,8 @@ def main() -> None:
         "rejected": {k: int(v) for k, v in reasons.items()},
         "source_check": comparison,
         "rules": {"min_years_for_verdict": MIN_YEARS_FOR_VERDICT, "reliable_share": THRESHOLD,
-                  "min_days_per_month": 5, "min_months_per_year": 9, "boom_bust_r": 0.3},
+                  "min_days_per_month": 5, "min_months_per_year": 9, "min_prior_months": 9,
+                  "boom_bust_r": 0.3},
         "credit": "Price and arrival data: Agmarknet (Directorate of Marketing & Inspection, GoI), "
                   "via the CEDA Agri Market API, Centre for Economic Data and Analysis, Ashoka University. "
                   "Weather: Open-Meteo historical weather API (ERA5 reanalysis), CC BY 4.0.",

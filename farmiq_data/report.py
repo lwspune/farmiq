@@ -29,8 +29,9 @@ def market_key(name: str) -> str:
 def seasonality_verdict(summary: pd.DataFrame, min_years: int = 8, threshold: float = 0.75) -> dict:
     """`summary`: one row per month with n_years and years_above_avg.
 
-    A month is reliably high if it was above that year's average in at least
-    `threshold` of years, reliably low if above average in at most 1 - threshold.
+    A month is reliably high if it was above its baseline (the average of the 12
+    months before it) in at least `threshold` of years, reliably low if above it in
+    at most 1 - threshold.
     """
     s = summary[summary["n_years"] > 0]
     n_years = int(s["n_years"].max()) if len(s) else 0
